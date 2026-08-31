@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+
+<div class="card error-box">
+
+    <h2>
+        Error
+    </h2>
+
+    <p>
+        Something went wrong while reading the database.
+    </p>
+
+    <pre>{{ error }}</pre>
+
+    <a
+        href="/"
+        class="button primary"
+    >
+        Go Back
+    </a>
+
+</div>
+
+{% endblock %}

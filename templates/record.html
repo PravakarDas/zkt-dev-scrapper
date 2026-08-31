@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+
+<div class="card">
+
+    <div class="details-header">
+
+        <div>
+
+            <h2>
+                Attendance Record #{{ record.id }}
+            </h2>
+
+            <p>
+                Complete record information
+            </p>
+
+        </div>
+
+        <a
+            href="{{ url_for('index') }}"
+            class="button secondary"
+        >
+            ← Back
+        </a>
+
+    </div>
+
+
+    <div class="details-grid">
+
+
+        <div class="detail-section">
+
+            <h3>
+                Attendance
+            </h3>
+
+            <div class="detail-row">
+                <span>Employee ID</span>
+                <strong>{{ record.user_id }}</strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Employee Name</span>
+                <strong>
+                    {{ record.user_name or "-" }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Attendance Time</span>
+                <strong>
+                    {{ record.attendance_time }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Status</span>
+                <strong>
+                    {{ record.status }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Punch</span>
+                <strong>
+                    {{ record.punch }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Punch Type</span>
+                <strong>
+                    {{ record.punch_type }}
+                </strong>
+            </div>
+
+        </div>
+
+
+        <div class="detail-section">
+
+            <h3>
+                Branch
+            </h3>
+
+            <div class="detail-row">
+                <span>Branch Name</span>
+                <strong>
+                    {{ record.branch_name }}
+                </strong>
+            </div>
+
+        </div>
+
+
+        <div class="detail-section">
+
+            <h3>
+                Device
+            </h3>
+
+            <div class="detail-row">
+                <span>IP Address</span>
+                <strong>
+                    {{ record.device_ip }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Port</span>
+                <strong>
+                    {{ record.device_port }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Serial</span>
+                <strong>
+                    {{ record.device_serial }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Device Name</span>
+                <strong>
+                    {{ record.device_name }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Platform</span>
+                <strong>
+                    {{ record.device_platform }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Firmware</span>
+                <strong>
+                    {{ record.device_firmware }}
+                </strong>
+            </div>
+
+        </div>
+
+
+        <div class="detail-section">
+
+            <h3>
+                Database
+            </h3>
+
+            <div class="detail-row">
+                <span>Database ID</span>
+                <strong>
+                    {{ record.id }}
+                </strong>
+            </div>
+
+            <div class="detail-row">
+                <span>Created At</span>
+                <strong>
+                    {{ record.created_at }}
+                </strong>
+            </div>
+
+        </div>
+
+
+    </div>
+
+
+    <div class="raw-data">
+
+        <h3>
+            Raw Device Data
+        </h3>
+
+        <pre>{{ record.raw_data }}</pre>
+
+    </div>
+
+</div>
+
+{% endblock %}

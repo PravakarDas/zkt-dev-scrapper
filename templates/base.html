@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        ZKTeco Attendance
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <header class="header">
+
+        <div>
+
+            <h1>
+                ZKTeco Attendance
+            </h1>
+
+            <p>
+                Attendance database dashboard
+            </p>
+
+        </div>
+
+        <a
+            href="/"
+            class="home-button"
+        >
+            Attendance
+        </a>
+
+    </header>
+
+
+    {% block content %}
+    {% endblock %}
+
+</div>
+
+</body>
+
+</html>

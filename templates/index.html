@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>ZKTeco Attendance</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+    <style>
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f5f6f8;
+            font-family: Arial, sans-serif;
+            color: #222;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1700px;
+            margin: 30px auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .header p {
+            margin: 7px 0 0;
+            color: #666;
+        }
+
+        .button {
+            display: inline-block;
+            background: #222;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .button:hover {
+            background: #444;
+        }
+
+        .button.green {
+            background: #198754;
+        }
+
+        .button.gray {
+            background: #666;
+        }
+
+        .filter-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(180px, 1fr));
+
+            gap: 15px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .field label {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .field input,
+        .field select {
+            height: 38px;
+            padding: 0 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: white;
+            box-sizing: border-box;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        .summary {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+
+        .summary strong {
+            font-size: 18px;
+        }
+
+        .table-box {
+            background: white;
+            border-radius: 8px;
+            overflow-x: auto;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1500px;
+        }
+
+        th {
+            background: #eeeeee;
+            text-align: left;
+            padding: 11px 10px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 10px;
+            border-top: 1px solid #eeeeee;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        tr:hover td {
+            background: #fafafa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            background: #eee;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: white;
+            margin-top: 15px;
+            border-radius: 8px;
+        }
+
+        .pagination a {
+            text-decoration: none;
+            background: #222;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 5px;
+        }
+
+        .pagination a:hover {
+            background: #444;
+        }
+
+        .pagination span {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .empty {
+            padding: 40px;
+            text-align: center;
+            color: #777;
+        }
+
+        .record-link {
+            color: #222;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .record-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 700px) {
+
+            .container {
+                width: 94%;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .actions .button {
+                text-align: center;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+
+    <!-- ======================================================
+         HEADER
+         ====================================================== -->
+
+    <div class="header">
+
+        <div>
+
+            <h1>
+                ZKTeco Attendance
+            </h1>
+
+            <p>
+                Attendance database dashboard
+            </p>
+
+        </div>
+
+        <div>
+
+            <a
+                href="{{ url_for('index') }}"
+                class="button"
+            >
+                Attendance
+            </a>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- ======================================================
+         FILTERS
+         ====================================================== -->
+
+    <div class="filter-box">
+
+        <form
+            method="GET"
+            action="{{ url_for('index') }}"
+        >
+
+            <div class="filter-grid">
+
+
+                <!-- Employee ID -->
+
+                <div class="field">
+
+                    <label>
+                        Employee ID
+                    </label>
+
+                    <input
+                        type="text"
+                        name="employee_id"
+                        value="{{ filters.get('employee_id', '') }}"
+                        placeholder="Employee ID"
+                    >
+
+                </div>
+
+
+
+                <!-- From Date -->
+
+                <div class="field">
+
+                    <label>
+                        From Date
+                    </label>
+
+                    <input
+                        type="date"
+                        name="from_date"
+                        value="{{ filters.get('from_date', '') }}"
+                    >
+
+                </div>
+
+
+
+                <!-- To Date -->
+
+                <div class="field">
+
+                    <label>
+                        To Date
+                    </label>
+
+                    <input
+                        type="date"
+                        name="to_date"
+                        value="{{ filters.get('to_date', '') }}"
+                    >
+
+                </div>
+
+
+
+                <!-- Branch -->
+
+                <div class="field">
+
+                    <label>
+                        Branch
+                    </label>
+
+                    <select name="branch">
+
+                        <option value="">
+                            All Branches
+                        </option>
+
+                        {% for branch in options.get('branches', []) %}
+
+                            <option
+                                value="{{ branch }}"
+                                {% if filters.get('branch', '') == branch %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ branch }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- Device -->
+
+                <div class="field">
+
+                    <label>
+                        Device
+                    </label>
+
+                    <select name="device_ip">
+
+                        <option value="">
+                            All Devices
+                        </option>
+
+                        {% for device in options.get('devices', []) %}
+
+                            <option
+                                value="{{ device }}"
+                                {% if filters.get('device_ip', '') == device %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ device }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- Punch Type -->
+
+                <div class="field">
+
+                    <label>
+                        Punch Type
+                    </label>
+
+                    <select name="punch_type">
+
+                        <option value="">
+                            All Punch Types
+                        </option>
+
+                        {% for punch in options.get('punch_types', []) %}
+
+                            <option
+                                value="{{ punch }}"
+                                {% if filters.get('punch_type', '') == punch|string %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ punch }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+
+                <!-- Status -->
+
+                <div class="field">
+
+                    <label>
+                        Status
+                    </label>
+
+                    <select name="status">
+
+                        <option value="">
+                            All Status
+                        </option>
+
+                        {% for status in options.get('statuses', []) %}
+
+                            <option
+                                value="{{ status }}"
+                                {% if filters.get('status', '') == status|string %}
+                                    selected
+                                {% endif %}
+                            >
+                                {{ status }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- ACTIONS -->
+
+            <div class="actions">
+
+                <button
+                    type="submit"
+                    class="button"
+                >
+                    Search
+                </button>
+
+
+                <a
+                    href="{{ url_for('index') }}"
+                    class="button gray"
+                >
+                    Clear
+                </a>
+
+
+                <button
+                    type="submit"
+                    formaction="{{ url_for('download_csv') }}"
+                    class="button green"
+                >
+                    Download CSV
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+
+    <!-- ======================================================
+         SUMMARY
+         ====================================================== -->
+
+    <div class="summary">
+
+        Showing
+
+        <strong>
+            {{ total_records }}
+        </strong>
+
+        records.
+
+    </div>
+
+
+
+    <!-- ======================================================
+         DATA TABLE
+         ====================================================== -->
+
+    <div class="table-box">
+
+        {% if records %}
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>ID</th>
+
+                    <th>Branch</th>
+
+                    <th>Employee ID</th>
+
+                    <th>Employee Name</th>
+
+                    <th>Attendance Time</th>
+
+                    <th>Status</th>
+
+                    <th>Punch</th>
+
+                    <th>Punch Type</th>
+
+                    <th>Device ID</th>
+
+                    <th>Device IP</th>
+
+                    <th>Device Port</th>
+
+                    <th>Device Name</th>
+
+                    <th>Serial Number</th>
+
+                    <th>Firmware</th>
+
+                    <th>Platform</th>
+
+                    <th>Created At</th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+            {% for record in records %}
+
+                <tr>
+
+
+                    <!-- DATABASE ID -->
+
+                    <td>
+
+                        <a
+                            class="record-link"
+                            href="{{ url_for(
+                                'record_details',
+                                record_id=record['id']
+                            ) }}"
+                        >
+                            {{ record.get('id', '') }}
+                        </a>
+
+                    </td>
+
+
+
+                    <!-- BRANCH -->
+
+                    <td>
+
+                        {{ record.get('branch_name', '') }}
+
+                    </td>
+
+
+
+                    <!-- EMPLOYEE ID -->
+
+                    <td>
+
+                        {{ record.get('user_id', '') }}
+
+                    </td>
+
+
+
+                    <!-- EMPLOYEE NAME -->
+
+                    <td>
+
+                        {{ record.get('user_name', '') }}
+
+                    </td>
+
+
+
+                    <!-- ATTENDANCE TIME -->
+
+                    <td>
+
+                        {{ record.get('attendance_time', '') }}
+
+                    </td>
+
+
+
+                    <!-- STATUS -->
+
+                    <td>
+
+                        <span class="badge">
+
+                            {{ record.get('status', '') }}
+
+                        </span>
+
+                    </td>
+
+
+
+                    <!-- PUNCH -->
+
+                    <td>
+
+                        {{ record.get('punch', '') }}
+
+                    </td>
+
+
+
+                    <!-- PUNCH TYPE -->
+
+                    <td>
+
+                        {{ record.get('punch_type', '') }}
+
+                    </td>
+
+
+
+                    <!-- DEVICE ID -->
+
+                    <td>
+
+                        {{ record.get('device_id', '') }}
+
+                    </td>
+
+
+
+                    <!-- DEVICE IP -->
+
+                    <td>
+
+                        {{ record.get('device_ip', '') }}
+
+                    </td>
+
+
+
+                    <!-- DEVICE PORT -->
+
+                    <td>
+
+                        {{ record.get('device_port', '') }}
+
+                    </td>
+
+
+
+                    <!-- DEVICE NAME -->
+
+                    <td>
+
+                        {{ record.get('device_name', '') }}
+
+                    </td>
+
+
+
+                    <!-- SERIAL -->
+
+                    <td>
+
+                        {{ record.get('serial_number', '') }}
+
+                    </td>
+
+
+
+                    <!-- FIRMWARE -->
+
+                    <td>
+
+                        {{ record.get('firmware', '') }}
+
+                    </td>
+
+
+
+                    <!-- PLATFORM -->
+
+                    <td>
+
+                        {{ record.get('platform', '') }}
+
+                    </td>
+
+
+
+                    <!-- CREATED AT -->
+
+                    <td>
+
+                        {{ record.get('created_at', '') }}
+
+                    </td>
+
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+
+        {% else %}
+
+        <div class="empty">
+
+            <h3>
+                No attendance records found
+            </h3>
+
+            <p>
+                Try changing the employee ID, date or device filters.
+            </p>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+
+
+    <!-- ======================================================
+         PAGINATION
+         ====================================================== -->
+
+    {% if total_pages > 1 %}
+
+    <div class="pagination">
+
+
+        {% if page > 1 %}
+
+        <a
+            href="{{ url_for(
+                'index',
+                page=page-1,
+                employee_id=filters.get('employee_id', ''),
+                branch=filters.get('branch', ''),
+                device_ip=filters.get('device_ip', ''),
+                from_date=filters.get('from_date', ''),
+                to_date=filters.get('to_date', ''),
+                punch_type=filters.get('punch_type', ''),
+                status=filters.get('status', '')
+            ) }}"
+        >
+            ← Previous
+        </a>
+
+        {% endif %}
+
+
+
+        <span>
+
+            Page
+            {{ page }}
+            of
+            {{ total_pages }}
+
+        </span>
+
+
+
+        {% if page < total_pages %}
+
+        <a
+            href="{{ url_for(
+                'index',
+                page=page+1,
+                employee_id=filters.get('employee_id', ''),
+                branch=filters.get('branch', ''),
+                device_ip=filters.get('device_ip', ''),
+                from_date=filters.get('from_date', ''),
+                to_date=filters.get('to_date', ''),
+                punch_type=filters.get('punch_type', ''),
+                status=filters.get('status', '')
+            ) }}"
+        >
+            Next →
+        </a>
+
+        {% endif %}
+
+
+    </div>
+
+    {% endif %}
+
+
+</div>
+
+</body>
+
+</html>
