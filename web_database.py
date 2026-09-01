@@ -32,7 +32,6 @@ def build_filters(args):
     conditions = []
     params = []
 
-
     # --------------------------------------------------------
     # Record ID
     # --------------------------------------------------------
@@ -60,7 +59,6 @@ def build_filters(args):
                 "1 = 0"
             )
 
-
     # --------------------------------------------------------
     # Employee ID
     # --------------------------------------------------------
@@ -79,7 +77,6 @@ def build_filters(args):
         params.append(
             employee_id
         )
-
 
     # --------------------------------------------------------
     # Branch
@@ -100,7 +97,6 @@ def build_filters(args):
             branch
         )
 
-
     # --------------------------------------------------------
     # Device IP
     # --------------------------------------------------------
@@ -119,7 +115,6 @@ def build_filters(args):
         params.append(
             device_ip
         )
-
 
     # --------------------------------------------------------
     # Device Serial
@@ -140,7 +135,6 @@ def build_filters(args):
             device_serial
         )
 
-
     # --------------------------------------------------------
     # Punch Type
     # --------------------------------------------------------
@@ -159,7 +153,6 @@ def build_filters(args):
         params.append(
             punch_type
         )
-
 
     # --------------------------------------------------------
     # Status
@@ -188,7 +181,6 @@ def build_filters(args):
                 "1 = 0"
             )
 
-
     # --------------------------------------------------------
     # From Date
     # --------------------------------------------------------
@@ -207,7 +199,6 @@ def build_filters(args):
         params.append(
             from_date
         )
-
 
     # --------------------------------------------------------
     # To Date
@@ -229,7 +220,6 @@ def build_filters(args):
             to_date
         )
 
-
     # --------------------------------------------------------
     # WHERE
     # --------------------------------------------------------
@@ -244,7 +234,6 @@ def build_filters(args):
     else:
 
         where_sql = ""
-
 
     return where_sql, params
 
@@ -263,11 +252,9 @@ def get_attendance_records(
         args
     )
 
-
     offset = (
         page - 1
     ) * per_page
-
 
     query = f"""
 
@@ -321,7 +308,6 @@ def get_attendance_records(
 
     """
 
-
     query_params = (
         params
         + [
@@ -329,7 +315,6 @@ def get_attendance_records(
             offset
         ]
     )
-
 
     with get_connection() as conn:
 
@@ -341,7 +326,6 @@ def get_attendance_records(
             )
 
             records = cur.fetchall()
-
 
     return records
 
@@ -356,7 +340,6 @@ def count_attendance_records(args):
         args
     )
 
-
     query = f"""
 
         SELECT COUNT(*)
@@ -366,7 +349,6 @@ def count_attendance_records(args):
         {where_sql}
 
     """
-
 
     with get_connection() as conn:
 
@@ -378,7 +360,6 @@ def count_attendance_records(args):
             )
 
             result = cur.fetchone()
-
 
     return result["count"]
 
@@ -435,7 +416,6 @@ def get_record(record_id):
 
     """
 
-
     with get_connection() as conn:
 
         with conn.cursor() as cur:
@@ -458,7 +438,6 @@ def get_filter_options():
 
         with conn.cursor() as cur:
 
-
             # ------------------------------------------------
             # Branches
             # ------------------------------------------------
@@ -475,7 +454,6 @@ def get_filter_options():
 
             """)
 
-
             branches = [
 
                 row["branch_name"]
@@ -483,7 +461,6 @@ def get_filter_options():
                 for row in cur.fetchall()
 
             ]
-
 
             # ------------------------------------------------
             # Device IPs
@@ -501,7 +478,6 @@ def get_filter_options():
 
             """)
 
-
             device_ips = [
 
                 row["device_ip"]
@@ -509,7 +485,6 @@ def get_filter_options():
                 for row in cur.fetchall()
 
             ]
-
 
             # ------------------------------------------------
             # Device serials
@@ -527,7 +502,6 @@ def get_filter_options():
 
             """)
 
-
             device_serials = [
 
                 row["serial_number"]
@@ -535,7 +509,6 @@ def get_filter_options():
                 for row in cur.fetchall()
 
             ]
-
 
             # ------------------------------------------------
             # Punch types
@@ -553,7 +526,6 @@ def get_filter_options():
 
             """)
 
-
             punch_types = [
 
                 row["punch_type"]
@@ -562,18 +534,145 @@ def get_filter_options():
 
             ]
 
+            # ------------------------------------------------
+            # Status values
+            # ------------------------------------------------
+
+            cur.execute(f"""
+
+                SELECT DISTINCT status
+
+                FROM {TABLE_NAME}
+
+                WHERE status IS NOT NULL
+
+                ORDER BY status
+
+            """)
+
+            statuses = [
+
+                row["status"]
+
+                for row in cur.fetchall()
+
+            ]
 
     return {
 
         "branches": branches,
 
+        "devices": device_ips,
+
         "device_ips": device_ips,
 
         "device_serials": device_serials,
 
-        "punch_types": punch_types
+        "punch_types": punch_types,
+
+        "statuses": statuses
 
     }
+
+
+# ============================================================
+# JSON SERIALIZATION HELPER
+# ============================================================
+
+def serialize_record(record):
+
+    result = {}
+
+    for key, value in record.items():
+
+        if value is None:
+
+            result[key] = None
+
+        elif hasattr(value, "isoformat"):
+
+            result[key] = value.isoformat(
+                sep=" ",
+                timespec="seconds"
+            )
+
+        else:
+
+            result[key] = value
+
+    return result
+
+
+# ============================================================
+# API DATA
+# ============================================================
+
+def get_attendance_api_data(
+    args,
+    page=1,
+    per_page=50
+):
+
+    records = get_attendance_records(
+        args,
+        page=page,
+        per_page=per_page
+    )
+
+    total_records = count_attendance_records(
+        args
+    )
+
+    total_pages = (
+        (
+            total_records
+            + per_page
+            - 1
+        )
+        // per_page
+    )
+
+    result = {
+
+        "count": total_records,
+
+        "page": page,
+
+        "per_page": per_page,
+
+        "total_pages": total_pages,
+
+        "next": (
+            page + 1
+            if page < total_pages
+            else None
+        ),
+
+        "previous": (
+            page - 1
+            if page > 1
+            else None
+        ),
+
+        "data": [
+
+            serialize_record(record)
+
+            for record in records
+
+        ]
+
+    }
+
+    # Load filter options only for first API request.
+    # This avoids running these extra queries on every
+    # pagination request.
+
+    if page == 1:
+
+        result["options"] = get_filter_options()
+
+    return result
 
 
 # ============================================================
@@ -585,7 +684,6 @@ def export_csv(args):
     where_sql, params = build_filters(
         args
     )
-
 
     query = f"""
 
@@ -637,13 +735,11 @@ def export_csv(args):
 
     """
 
-
     output = io.StringIO()
 
     writer = csv.writer(
         output
     )
-
 
     headers = [
 
@@ -683,11 +779,9 @@ def export_csv(args):
 
     ]
 
-
     writer.writerow(
         headers
     )
-
 
     with get_connection() as conn:
 
@@ -697,7 +791,6 @@ def export_csv(args):
                 query,
                 params
             )
-
 
             for row in cur:
 
@@ -738,6 +831,5 @@ def export_csv(args):
                     row["created_at"]
 
                 ])
-
 
     return output.getvalue()

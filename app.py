@@ -5,7 +5,8 @@ from flask import (
     Response,
     redirect,
     url_for,
-    flash
+    flash,
+    jsonify
 )
 
 from web_database import (
@@ -13,7 +14,8 @@ from web_database import (
     count_attendance_records,
     get_record,
     get_filter_options,
-    export_csv
+    export_csv,
+    get_attendance_api_data
 )
 
 from database import (
@@ -30,6 +32,14 @@ from device_manager import test_device
 app = Flask(__name__)
 
 app.secret_key = "zkteco-local-secret-key"
+
+
+# ============================================================
+# SETTINGS
+# ============================================================
+
+PER_PAGE = 50
+
 
 # ============================================================
 # PAGINATION URL HELPER
@@ -52,11 +62,10 @@ def utility_processor():
     return {
         "pagination_url": pagination_url
     }
-PER_PAGE = 50
 
 
 # ============================================================
-# ATTENDANCE
+# ATTENDANCE PAGE
 # ============================================================
 
 @app.route("/")
@@ -64,40 +73,15 @@ def index():
 
     try:
 
-        page = request.args.get(
-            "page",
-            1,
-            type=int
-        )
-
-        if page < 1:
-            page = 1
-
-        records = get_attendance_records(
-            request.args,
-            page=page,
-            per_page=PER_PAGE
-        )
-
-        total_records = count_attendance_records(
-            request.args
-        )
-
-        total_pages = (
-            (total_records + PER_PAGE - 1)
-            // PER_PAGE
-        )
-
-        options = get_filter_options()
+        # IMPORTANT:
+        #
+        # Do NOT load attendance records here.
+        #
+        # The browser will call /api/attendance
+        # using JavaScript.
 
         return render_template(
-            "index.html",
-            records=records,
-            total_records=total_records,
-            page=page,
-            total_pages=total_pages,
-            options=options,
-            filters=request.args
+            "index.html"
         )
 
     except Exception as error:
@@ -109,10 +93,64 @@ def index():
 
 
 # ============================================================
+# ATTENDANCE API
+# ============================================================
+
+@app.route("/api/attendance")
+def attendance_api():
+
+    try:
+
+        page = request.args.get(
+            "page",
+            1,
+            type=int
+        )
+
+        if page < 1:
+
+            page = 1
+
+        data = get_attendance_api_data(
+            request.args,
+            page=page,
+            per_page=PER_PAGE
+        )
+
+        return jsonify(
+            data
+        )
+
+    except Exception as error:
+
+        return jsonify({
+
+            "count": 0,
+
+            "page": 1,
+
+            "per_page": PER_PAGE,
+
+            "total_pages": 0,
+
+            "next": None,
+
+            "previous": None,
+
+            "data": [],
+
+            "error": str(error)
+
+        }), 500
+
+
+# ============================================================
 # RECORD DETAILS
 # ============================================================
 
-@app.route("/record/<int:record_id>")
+@app.route(
+    "/record/<int:record_id>"
+)
 def record_details(record_id):
 
     try:
@@ -161,10 +199,13 @@ def download_csv():
             mimetype="text/csv",
 
             headers={
+
                 "Content-Disposition":
                     "attachment; "
                     "filename=zkteco_attendance.csv"
+
             }
+
         )
 
     except Exception as error:
@@ -254,7 +295,9 @@ def add_device_page():
 
     try:
 
-        port = int(port_value)
+        port = int(
+            port_value
+        )
 
     except ValueError:
 
@@ -268,7 +311,7 @@ def add_device_page():
         )
 
     # --------------------------------------------------------
-    # Check if device already exists
+    # Check existing device
     # --------------------------------------------------------
 
     from database import get_device_by_ip
@@ -290,7 +333,7 @@ def add_device_page():
         )
 
     # --------------------------------------------------------
-    # Connect to device
+    # Test device
     # --------------------------------------------------------
 
     result = test_device(
@@ -326,13 +369,13 @@ def add_device_page():
         )
 
     # --------------------------------------------------------
-    # Use serial as stable device ID
+    # Stable device ID
     # --------------------------------------------------------
 
     device_id = serial.strip()
 
     # --------------------------------------------------------
-    # Save
+    # Save device
     # --------------------------------------------------------
 
     try:
@@ -360,6 +403,7 @@ def add_device_page():
             platform=result.get(
                 "platform"
             )
+
         )
 
     except Exception as error:
@@ -385,7 +429,7 @@ def add_device_page():
 
 
 # ============================================================
-# DISABLE DEVICE
+# REMOVE / DEACTIVATE DEVICE
 # ============================================================
 
 @app.route(
@@ -444,8 +488,6 @@ def activate_device_page(device_id):
 
     try:
 
-        from database import activate_device
-
         activate_device(
             device_id
         )
@@ -474,9 +516,11 @@ def activate_device_page(device_id):
 @app.route("/health")
 def health():
 
-    return {
+    return jsonify({
+
         "status": "ok"
-    }
+
+    })
 
 
 # ============================================================
@@ -486,9 +530,19 @@ def health():
 if __name__ == "__main__":
 
     print()
-    print("=" * 60)
-    print("ZKTeco Attendance Dashboard")
-    print("=" * 60)
+
+    print(
+        "=" * 60
+    )
+
+    print(
+        "ZKTeco Attendance Dashboard"
+    )
+
+    print(
+        "=" * 60
+    )
+
     print()
 
     print(
@@ -499,10 +553,18 @@ if __name__ == "__main__":
         "Devices: http://127.0.0.1:5000/devices"
     )
 
+    print(
+        "API: http://127.0.0.1:5000/api/attendance"
+    )
+
     print()
 
     app.run(
+
         host="0.0.0.0",
+
         port=5000,
+
         debug=False
+
     )

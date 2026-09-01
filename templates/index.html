@@ -1,685 +1,839 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block title %}
-Attendance - ZKTeco
-{% endblock %}
+<head>
 
+    <meta charset="UTF-8">
 
-{% block content %}
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<style>
+    <title>
+        ZKTeco Attendance
+    </title>
 
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        gap: 15px;
-    }
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
 
-    .page-header h2 {
-        margin: 0;
-        font-size: 24px;
-    }
+    <style>
 
-    .page-header p {
-        margin: 5px 0 0;
-        color: #666;
-    }
+        body {
 
+            margin: 0;
 
-    .filter-box {
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
+            padding: 0;
 
-    .filter-box h3 {
-        margin-top: 0;
-        margin-bottom: 15px;
-    }
+            background: #f5f6f8;
 
+            font-family: Arial, sans-serif;
 
-    .filter-grid {
-        display: grid;
-        grid-template-columns:
-            repeat(auto-fit, minmax(180px, 1fr));
+            color: #222;
 
-        gap: 12px;
-    }
-
-
-    .filter-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-
-    .filter-group label {
-        font-size: 13px;
-        font-weight: bold;
-        color: #444;
-    }
-
-
-    .filter-group input,
-    .filter-group select {
-
-        width: 100%;
-        box-sizing: border-box;
-
-        padding: 9px 10px;
-
-        border: 1px solid #ccc;
-        border-radius: 5px;
-
-        background: white;
-
-        font-size: 14px;
-    }
-
-
-    .filter-actions {
-        display: flex;
-        gap: 10px;
-        margin-top: 15px;
-        flex-wrap: wrap;
-    }
-
-
-    .button {
-
-        display: inline-block;
-
-        background: #222;
-        color: white;
-
-        padding: 10px 16px;
-
-        border-radius: 6px;
-
-        text-decoration: none;
-
-        border: none;
-
-        cursor: pointer;
-
-        font-size: 14px;
-    }
-
-    .button:hover {
-        background: #444;
-    }
-
-
-    .button.green {
-        background: #198754;
-    }
-
-    .button.green:hover {
-        background: #146c43;
-    }
-
-
-    .button.gray {
-        background: #666;
-    }
-
-    .button.gray:hover {
-        background: #555;
-    }
-
-
-    .summary-box {
-
-        background: white;
-
-        padding: 15px 20px;
-
-        border-radius: 8px;
-
-        margin-bottom: 20px;
-
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-
-
-    .summary-box strong {
-        font-size: 18px;
-    }
-
-
-    .table-wrapper {
-
-        background: white;
-
-        border-radius: 8px;
-
-        overflow-x: auto;
-
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-
-
-    table {
-
-        width: 100%;
-
-        border-collapse: collapse;
-
-        min-width: 1250px;
-    }
-
-
-    th,
-    td {
-
-        padding: 11px 10px;
-
-        border-bottom: 1px solid #eee;
-
-        text-align: left;
-
-        font-size: 13px;
-
-        white-space: nowrap;
-    }
-
-
-    th {
-
-        background: #f4f5f7;
-
-        font-weight: bold;
-
-        position: sticky;
-
-        top: 0;
-
-        z-index: 1;
-    }
-
-
-    tr:hover td {
-        background: #fafafa;
-    }
-
-
-    .record-link {
-
-        color: #0d6efd;
-
-        text-decoration: none;
-
-        font-weight: bold;
-    }
-
-
-    .record-link:hover {
-        text-decoration: underline;
-    }
-
-
-    .status-badge {
-
-        display: inline-block;
-
-        padding: 4px 8px;
-
-        border-radius: 12px;
-
-        font-size: 12px;
-    }
-
-
-    .punch-badge {
-
-        display: inline-block;
-
-        padding: 4px 8px;
-
-        border-radius: 12px;
-
-        background: #f1f1f1;
-
-        font-size: 12px;
-    }
-
-
-    .pagination {
-
-        display: flex;
-
-        justify-content: center;
-
-        align-items: center;
-
-        gap: 6px;
-
-        margin-top: 20px;
-
-        flex-wrap: wrap;
-    }
-
-
-    .pagination a,
-    .pagination span {
-
-        padding: 8px 12px;
-
-        border: 1px solid #ddd;
-
-        border-radius: 5px;
-
-        text-decoration: none;
-
-        color: #333;
-
-        background: white;
-
-        font-size: 14px;
-    }
-
-
-    .pagination a:hover {
-        background: #f0f0f0;
-    }
-
-
-    .pagination .current {
-
-        background: #222;
-
-        color: white;
-
-        border-color: #222;
-    }
-
-
-    .empty-state {
-
-        padding: 40px;
-
-        text-align: center;
-
-        color: #666;
-    }
-
-
-    @media (max-width: 700px) {
-
-        .page-header {
-
-            flex-direction: column;
-
-            align-items: flex-start;
         }
+
+
+        .container {
+
+            width: 95%;
+
+            max-width: 1700px;
+
+            margin: 30px auto;
+
+        }
+
+
+        .header {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            margin-bottom: 25px;
+
+        }
+
+
+        .header h1 {
+
+            margin: 0;
+
+            font-size: 28px;
+
+        }
+
+
+        .header p {
+
+            margin: 7px 0 0;
+
+            color: #666;
+
+        }
+
+
+        .header-actions {
+
+            display: flex;
+
+            gap: 10px;
+
+        }
+
+
+        .button {
+
+            display: inline-block;
+
+            background: #222;
+
+            color: white;
+
+            padding: 10px 16px;
+
+            border-radius: 6px;
+
+            text-decoration: none;
+
+            border: none;
+
+            cursor: pointer;
+
+            font-size: 14px;
+
+        }
+
+
+        .button:hover {
+
+            background: #444;
+
+        }
+
+
+        .button.green {
+
+            background: #198754;
+
+        }
+
+
+        .button.green:hover {
+
+            background: #146c43;
+
+        }
+
+
+        .button.gray {
+
+            background: #666;
+
+        }
+
+
+        .button.gray:hover {
+
+            background: #555;
+
+        }
+
+
+        .filter-box {
+
+            background: white;
+
+            padding: 20px;
+
+            border-radius: 8px;
+
+            margin-bottom: 20px;
+
+            box-shadow:
+                0 1px 4px rgba(
+                    0,
+                    0,
+                    0,
+                    0.08
+                );
+
+        }
+
+
+        .filter-box h3 {
+
+            margin-top: 0;
+
+            margin-bottom: 15px;
+
+        }
+
 
         .filter-grid {
 
-            grid-template-columns: 1fr;
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(
+                        180px,
+                        1fr
+                    )
+                );
+
+            gap: 15px;
+
         }
 
-    }
 
-</style>
+        .field {
 
+            display: flex;
 
-<!-- ====================================================== -->
-<!-- PAGE HEADER -->
-<!-- ====================================================== -->
+            flex-direction: column;
 
-<div class="page-header">
+        }
 
-    <div>
 
-        <h2>
-            Attendance Records
-        </h2>
+        .field label {
 
-        <p>
-            Search, filter and view ZKTeco attendance data.
-        </p>
+            font-size: 13px;
 
-    </div>
+            font-weight: bold;
 
-</div>
+            margin-bottom: 6px;
 
+        }
 
-<!-- ====================================================== -->
-<!-- FILTERS -->
-<!-- ====================================================== -->
 
-<div class="filter-box">
+        .field input,
+        .field select {
 
-    <h3>
-        Search & Filters
-    </h3>
+            height: 38px;
 
+            padding: 0 10px;
 
-    <form
-        method="GET"
-        action="{{ url_for('index') }}"
-    >
+            border: 1px solid #ccc;
 
-        <div class="filter-grid">
+            border-radius: 5px;
 
+            background: white;
 
-            <!-- ID -->
+            box-sizing: border-box;
 
-            <div class="filter-group">
+        }
 
-                <label for="record_id">
-                    Record ID
-                </label>
 
-                <input
-                    type="text"
-                    id="record_id"
-                    name="record_id"
-                    value="{{ filters.get('record_id', '') }}"
-                    placeholder="Record ID"
-                >
+        .actions {
 
-            </div>
+            display: flex;
 
+            gap: 10px;
 
-            <!-- Employee ID -->
+            align-items: center;
 
-            <div class="filter-group">
+            flex-wrap: wrap;
 
-                <label for="employee_id">
-                    Employee ID
-                </label>
+            margin-top: 18px;
 
-                <input
-                    type="text"
-                    id="employee_id"
-                    name="employee_id"
-                    value="{{ filters.get('employee_id', '') }}"
-                    placeholder="Employee ID"
-                >
+        }
 
-            </div>
 
+        .summary {
 
-            <!-- Branch -->
+            background: white;
 
-            <div class="filter-group">
+            padding: 15px 20px;
 
-                <label for="branch">
-                    Branch
-                </label>
+            border-radius: 8px;
 
-                <select
-                    id="branch"
-                    name="branch"
-                >
+            margin-bottom: 15px;
 
-                    <option value="">
-                        All Branches
-                    </option>
+            box-shadow:
+                0 1px 4px rgba(
+                    0,
+                    0,
+                    0,
+                    0.08
+                );
 
-                    {% for branch in options.branches %}
+        }
 
-                        <option
-                            value="{{ branch }}"
-                            {% if filters.get('branch') == branch %}
-                                selected
-                            {% endif %}
-                        >
-                            {{ branch }}
-                        </option>
 
-                    {% endfor %}
+        .summary strong {
 
-                </select>
+            font-size: 18px;
 
-            </div>
+        }
 
 
-            <!-- Device IP -->
+        .loading {
 
-            <div class="filter-group">
+            color: #666;
 
-                <label for="device_ip">
-                    Device IP
-                </label>
+        }
 
-                <select
-                    id="device_ip"
-                    name="device_ip"
-                >
 
-                    <option value="">
-                        All Devices
-                    </option>
+        .error-message {
 
-                    {% for ip in options.device_ips %}
+            color: #b42318;
 
-                        <option
-                            value="{{ ip }}"
-                            {% if filters.get('device_ip') == ip %}
-                                selected
-                            {% endif %}
-                        >
-                            {{ ip }}
-                        </option>
+        }
 
-                    {% endfor %}
 
-                </select>
+        .table-box {
 
-            </div>
+            background: white;
 
+            border-radius: 8px;
 
-            <!-- Serial -->
+            overflow-x: auto;
 
-            <div class="filter-group">
+            box-shadow:
+                0 1px 4px rgba(
+                    0,
+                    0,
+                    0,
+                    0.08
+                );
 
-                <label for="device_serial">
-                    Device Serial
-                </label>
+        }
 
-                <select
-                    id="device_serial"
-                    name="device_serial"
-                >
 
-                    <option value="">
-                        All Serials
-                    </option>
+        table {
 
-                    {% for serial in options.device_serials %}
+            width: 100%;
 
-                        <option
-                            value="{{ serial }}"
-                            {% if filters.get('device_serial') == serial %}
-                                selected
-                            {% endif %}
-                        >
-                            {{ serial }}
-                        </option>
+            border-collapse: collapse;
 
-                    {% endfor %}
+            min-width: 1500px;
 
-                </select>
+        }
 
-            </div>
 
+        th {
 
-            <!-- Punch Type -->
+            background: #eeeeee;
 
-            <div class="filter-group">
+            text-align: left;
 
-                <label for="punch_type">
-                    Punch Type
-                </label>
+            padding: 11px 10px;
 
-                <select
-                    id="punch_type"
-                    name="punch_type"
-                >
+            font-size: 13px;
 
-                    <option value="">
-                        All Types
-                    </option>
+            white-space: nowrap;
 
-                    {% for punch_type in options.punch_types %}
+            position: sticky;
 
-                        <option
-                            value="{{ punch_type }}"
-                            {% if filters.get('punch_type') == punch_type %}
-                                selected
-                            {% endif %}
-                        >
-                            {{ punch_type }}
-                        </option>
+            top: 0;
 
-                    {% endfor %}
+            z-index: 1;
 
-                </select>
+        }
 
-            </div>
 
+        td {
 
-            <!-- Status -->
+            padding: 10px;
 
-            <div class="filter-group">
+            border-top: 1px solid #eeeeee;
 
-                <label for="status">
-                    Status
-                </label>
+            font-size: 13px;
 
-                <select
-                    id="status"
-                    name="status"
-                >
+            white-space: nowrap;
 
-                    <option value="">
-                        All Status
-                    </option>
+        }
 
-                    <option
-                        value="0"
-                        {% if filters.get('status') == '0' %}
-                            selected
-                        {% endif %}
-                    >
-                        0
-                    </option>
 
-                    <option
-                        value="1"
-                        {% if filters.get('status') == '1' %}
-                            selected
-                        {% endif %}
-                    >
-                        1
-                    </option>
+        tr:hover td {
 
-                </select>
+            background: #fafafa;
 
-            </div>
+        }
 
 
-            <!-- From Date -->
+        .badge {
 
-            <div class="filter-group">
+            display: inline-block;
 
-                <label for="from_date">
-                    From Date
-                </label>
+            padding: 4px 8px;
 
-                <input
-                    type="date"
-                    id="from_date"
-                    name="from_date"
-                    value="{{ filters.get('from_date', '') }}"
-                >
+            border-radius: 4px;
 
-            </div>
+            font-size: 12px;
 
+            background: #eee;
 
-            <!-- To Date -->
+        }
 
-            <div class="filter-group">
 
-                <label for="to_date">
-                    To Date
-                </label>
+        .record-link {
 
-                <input
-                    type="date"
-                    id="to_date"
-                    name="to_date"
-                    value="{{ filters.get('to_date', '') }}"
-                >
+            color: #0d6efd;
 
-            </div>
+            text-decoration: none;
+
+            font-weight: bold;
+
+        }
+
+
+        .record-link:hover {
+
+            text-decoration: underline;
+
+        }
+
+
+        .empty {
+
+            padding: 40px;
+
+            text-align: center;
+
+            color: #777;
+
+        }
+
+
+        .pagination {
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            gap: 15px;
+
+            padding: 20px;
+
+            background: white;
+
+            margin-top: 15px;
+
+            border-radius: 8px;
+
+        }
+
+
+        .pagination button {
+
+            text-decoration: none;
+
+            background: #222;
+
+            color: white;
+
+            padding: 8px 14px;
+
+            border-radius: 5px;
+
+            border: none;
+
+            cursor: pointer;
+
+        }
+
+
+        .pagination button:hover {
+
+            background: #444;
+
+        }
+
+
+        .pagination button:disabled {
+
+            background: #ccc;
+
+            cursor: not-allowed;
+
+        }
+
+
+        .pagination span {
+
+            font-size: 14px;
+
+            font-weight: bold;
+
+        }
+
+
+        @media (max-width: 700px) {
+
+            .container {
+
+                width: 94%;
+
+            }
+
+
+            .header {
+
+                flex-direction: column;
+
+                align-items: flex-start;
+
+                gap: 15px;
+
+            }
+
+
+            .header-actions {
+
+                width: 100%;
+
+            }
+
+
+            .header-actions .button {
+
+                text-align: center;
+
+            }
+
+
+            .actions {
+
+                flex-direction: column;
+
+                align-items: stretch;
+
+            }
+
+
+            .actions .button,
+            .actions button {
+
+                text-align: center;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+
+    <!-- ======================================================
+         HEADER
+         ====================================================== -->
+
+    <div class="header">
+
+        <div>
+
+            <h1>
+                ZKTeco Attendance
+            </h1>
+
+            <p>
+                Attendance database dashboard
+            </p>
 
         </div>
 
 
-        <div class="filter-actions">
-
-            <button
-                type="submit"
-                class="button"
-            >
-                Apply Filters
-            </button>
-
+        <div class="header-actions">
 
             <a
                 href="{{ url_for('index') }}"
-                class="button gray"
+                class="button"
             >
-                Clear
+                Attendance
             </a>
 
 
-            <button
-                type="submit"
-                formaction="{{ url_for('download_csv') }}"
-                class="button green"
+            <a
+                href="{{ url_for('devices') }}"
+                class="button"
             >
-                Export CSV
-            </button>
+                Devices
+            </a>
 
         </div>
 
-    </form>
-
-</div>
+    </div>
 
 
-<!-- ====================================================== -->
-<!-- SUMMARY -->
-<!-- ====================================================== -->
+    <!-- ======================================================
+         FILTERS
+         ====================================================== -->
 
-<div class="summary-box">
+    <div class="filter-box">
 
-    Showing
-
-    <strong>
-        {{ total_records|default(0) }}
-    </strong>
-
-    matching attendance record(s).
-
-</div>
+        <h3>
+            Search & Filters
+        </h3>
 
 
-<!-- ====================================================== -->
-<!-- TABLE -->
-<!-- ====================================================== -->
+        <form id="filter-form">
 
-<div class="table-wrapper">
+            <div class="filter-grid">
 
-    {% if records %}
+
+                <!-- Record ID -->
+
+                <div class="field">
+
+                    <label for="record_id">
+                        Record ID
+                    </label>
+
+                    <input
+                        type="text"
+                        id="record_id"
+                        name="record_id"
+                        placeholder="Record ID"
+                    >
+
+                </div>
+
+
+                <!-- Employee ID -->
+
+                <div class="field">
+
+                    <label for="employee_id">
+                        Employee ID
+                    </label>
+
+                    <input
+                        type="text"
+                        id="employee_id"
+                        name="employee_id"
+                        placeholder="Employee ID"
+                    >
+
+                </div>
+
+
+                <!-- Branch -->
+
+                <div class="field">
+
+                    <label for="branch">
+                        Branch
+                    </label>
+
+                    <select
+                        id="branch"
+                        name="branch"
+                    >
+
+                        <option value="">
+                            All Branches
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- Device IP -->
+
+                <div class="field">
+
+                    <label for="device_ip">
+                        Device IP
+                    </label>
+
+                    <select
+                        id="device_ip"
+                        name="device_ip"
+                    >
+
+                        <option value="">
+                            All Devices
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- Device Serial -->
+
+                <div class="field">
+
+                    <label for="device_serial">
+                        Device Serial
+                    </label>
+
+                    <select
+                        id="device_serial"
+                        name="device_serial"
+                    >
+
+                        <option value="">
+                            All Serials
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- Punch Type -->
+
+                <div class="field">
+
+                    <label for="punch_type">
+                        Punch Type
+                    </label>
+
+                    <select
+                        id="punch_type"
+                        name="punch_type"
+                    >
+
+                        <option value="">
+                            All Punch Types
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- Status -->
+
+                <div class="field">
+
+                    <label for="status">
+                        Status
+                    </label>
+
+                    <select
+                        id="status"
+                        name="status"
+                    >
+
+                        <option value="">
+                            All Status
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- From Date -->
+
+                <div class="field">
+
+                    <label for="from_date">
+                        From Date
+                    </label>
+
+                    <input
+                        type="date"
+                        id="from_date"
+                        name="from_date"
+                    >
+
+                </div>
+
+
+                <!-- To Date -->
+
+                <div class="field">
+
+                    <label for="to_date">
+                        To Date
+                    </label>
+
+                    <input
+                        type="date"
+                        id="to_date"
+                        name="to_date"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- ACTIONS -->
+
+            <div class="actions">
+
+                <button
+                    type="submit"
+                    class="button"
+                >
+                    Search
+                </button>
+
+
+                <button
+                    type="button"
+                    id="clear-button"
+                    class="button gray"
+                >
+                    Clear
+                </button>
+
+
+                <button
+                    type="button"
+                    id="csv-button"
+                    class="button green"
+                >
+                    Download CSV
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+
+    <!-- ======================================================
+         SUMMARY
+         ====================================================== -->
+
+    <div class="summary">
+
+        Showing
+
+        <strong id="total-records">
+            0
+        </strong>
+
+        records.
+
+        <span
+            id="loading-message"
+            class="loading"
+        >
+            Loading...
+        </span>
+
+    </div>
+
+
+    <!-- ======================================================
+         TABLE
+         ====================================================== -->
+
+    <div class="table-box">
 
         <table>
 
@@ -687,237 +841,894 @@ Attendance - ZKTeco
 
                 <tr>
 
-                    <th>
-                        ID
-                    </th>
+                    <th>ID</th>
 
-                    <th>
-                        Branch
-                    </th>
+                    <th>Branch</th>
 
-                    <th>
-                        Device
-                    </th>
+                    <th>Employee ID</th>
 
-                    <th>
-                        Serial
-                    </th>
+                    <th>Employee Name</th>
 
-                    <th>
-                        Employee ID
-                    </th>
+                    <th>Attendance Time</th>
 
-                    <th>
-                        Employee Name
-                    </th>
+                    <th>Status</th>
 
-                    <th>
-                        Attendance Time
-                    </th>
+                    <th>Punch</th>
 
-                    <th>
-                        Status
-                    </th>
+                    <th>Punch Type</th>
 
-                    <th>
-                        Punch
-                    </th>
+                    <th>Device ID</th>
 
-                    <th>
-                        Punch Type
-                    </th>
+                    <th>Device IP</th>
 
-                    <th>
-                        Created At
-                    </th>
+                    <th>Device Port</th>
 
-                    <th>
-                        Details
-                    </th>
+                    <th>Device Name</th>
+
+                    <th>Serial Number</th>
+
+                    <th>Firmware</th>
+
+                    <th>Platform</th>
+
+                    <th>Created At</th>
 
                 </tr>
 
             </thead>
 
 
-            <tbody>
-
-                {% for record in records %}
-
-                    <tr>
-
-                        <td>
-
-                            <a
-                                class="record-link"
-                                href="{{ url_for('record_details', record_id=record.id) }}"
-                            >
-                                {{ record.id }}
-                            </a>
-
-                        </td>
-
-
-                        <td>
-                            {{ record.branch_name or '-' }}
-                        </td>
-
-
-                        <td>
-
-                            {{ record.device_ip or '-' }}
-
-                            {% if record.device_port %}
-                                :{{ record.device_port }}
-                            {% endif %}
-
-                        </td>
-
-
-                        <td>
-                            {{ record.serial_number or '-' }}
-                        </td>
-
-
-                        <td>
-                            {{ record.user_id or '-' }}
-                        </td>
-
-
-                        <td>
-                            {{ record.user_name or '-' }}
-                        </td>
-
-
-                        <td>
-                            {{ record.attendance_time or '-' }}
-                        </td>
-
-
-                        <td>
-
-                            <span class="status-badge">
-                                {{ record.status if record.status is not none else '-' }}
-                            </span>
-
-                        </td>
-
-
-                        <td>
-
-                            <span class="punch-badge">
-                                {{ record.punch if record.punch is not none else '-' }}
-                            </span>
-
-                        </td>
-
-
-                        <td>
-                            {{ record.punch_type or '-' }}
-                        </td>
-
-
-                        <td>
-                            {{ record.created_at or '-' }}
-                        </td>
-
-
-                        <td>
-
-                            <a
-                                class="record-link"
-                                href="{{ url_for('record_details', record_id=record.id) }}"
-                            >
-                                View
-                            </a>
-
-                        </td>
-
-                    </tr>
-
-                {% endfor %}
+            <tbody id="attendance-body">
 
             </tbody>
 
         </table>
 
-    {% else %}
 
-        <div class="empty-state">
+        <div
+            id="empty-message"
+            class="empty"
+            style="display:none;"
+        >
 
             <h3>
-                No records found
+                No attendance records found
             </h3>
 
             <p>
-                Try changing your filters.
+                Try changing the filters.
             </p>
 
         </div>
 
-    {% endif %}
+    </div>
+
+
+    <!-- ======================================================
+         PAGINATION
+         ====================================================== -->
+
+    <div class="pagination">
+
+        <button
+            type="button"
+            id="previous-button"
+        >
+            ← Previous
+        </button>
+
+
+        <span id="page-info">
+            Page 1 of 1
+        </span>
+
+
+        <button
+            type="button"
+            id="next-button"
+        >
+            Next →
+        </button>
+
+    </div>
+
 
 </div>
 
 
-<!-- ====================================================== -->
-<!-- PAGINATION -->
-<!-- ====================================================== -->
+<script>
 
-{% if total_pages and total_pages > 1 %}
+    const API_URL = "/api/attendance";
 
-    <div class="pagination">
+    const PER_PAGE = 50;
 
 
-        {% if page > 1 %}
+    // ========================================================
+    // ELEMENTS
+    // ========================================================
 
-            <a
-                href="{{ pagination_url(page - 1) }}"
-            >
-                Previous
-            </a>
+    const filterForm =
+        document.getElementById(
+            "filter-form"
+        );
 
-        {% endif %}
+    const attendanceBody =
+        document.getElementById(
+            "attendance-body"
+        );
+
+    const totalRecordsElement =
+        document.getElementById(
+            "total-records"
+        );
+
+    const loadingMessage =
+        document.getElementById(
+            "loading-message"
+        );
+
+    const emptyMessage =
+        document.getElementById(
+            "empty-message"
+        );
+
+    const pageInfo =
+        document.getElementById(
+            "page-info"
+        );
+
+    const previousButton =
+        document.getElementById(
+            "previous-button"
+        );
+
+    const nextButton =
+        document.getElementById(
+            "next-button"
+        );
+
+    const clearButton =
+        document.getElementById(
+            "clear-button"
+        );
+
+    const csvButton =
+        document.getElementById(
+            "csv-button"
+        );
 
 
-        {% set start_page = [1, page - 2]|max %}
-
-        {% set end_page = [total_pages, page + 2]|min %}
+    let currentPage = 1;
 
 
-        {% for p in range(start_page, end_page + 1) %}
+    // ========================================================
+    // SAFE TEXT
+    // ========================================================
 
-            {% if p == page %}
+    function createCell(
+        value
+    ) {
 
-                <span class="current">
-                    {{ p }}
-                </span>
+        const cell =
+            document.createElement(
+                "td"
+            );
 
-            {% else %}
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
 
-                <a
-                    href="{{ pagination_url(p) }}"
-                >
-                    {{ p }}
-                </a>
+            cell.textContent = "-";
 
-            {% endif %}
+        } else {
 
-        {% endfor %}
+            cell.textContent =
+                value;
+
+        }
+
+        return cell;
+    }
 
 
-        {% if page < total_pages %}
+    // ========================================================
+    // CREATE RECORD LINK
+    // ========================================================
 
-            <a
-                href="{{ pagination_url(page + 1) }}"
-            >
-                Next
-            </a>
+    function createRecordLink(
+        record
+    ) {
 
-        {% endif %}
+        const cell =
+            document.createElement(
+                "td"
+            );
 
-    </div>
+        const link =
+            document.createElement(
+                "a"
+            );
 
-{% endif %}
+        link.className =
+            "record-link";
 
-{% endblock %}
+        link.href =
+            "/record/" +
+            encodeURIComponent(
+                record.id
+            );
+
+        link.textContent =
+            record.id;
+
+        cell.appendChild(
+            link
+        );
+
+        return cell;
+    }
+
+
+    // ========================================================
+    // CREATE BADGE
+    // ========================================================
+
+    function createBadgeCell(
+        value
+    ) {
+
+        const cell =
+            document.createElement(
+                "td"
+            );
+
+        const badge =
+            document.createElement(
+                "span"
+            );
+
+        badge.className =
+            "badge";
+
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
+
+            badge.textContent =
+                "-";
+
+        } else {
+
+            badge.textContent =
+                value;
+
+        }
+
+        cell.appendChild(
+            badge
+        );
+
+        return cell;
+    }
+
+
+    // ========================================================
+    // RENDER RECORDS
+    // ========================================================
+
+    function renderRecords(
+        records
+    ) {
+
+        attendanceBody.innerHTML =
+            "";
+
+        if (
+            !records ||
+            records.length === 0
+        ) {
+
+            emptyMessage.style.display =
+                "block";
+
+            return;
+
+        }
+
+        emptyMessage.style.display =
+            "none";
+
+
+        records.forEach(
+            function(record) {
+
+                const row =
+                    document.createElement(
+                        "tr"
+                    );
+
+
+                row.appendChild(
+                    createRecordLink(
+                        record
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.branch_name
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.user_id
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.user_name
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.attendance_time
+                    )
+                );
+
+
+                row.appendChild(
+                    createBadgeCell(
+                        record.status
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.punch
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.punch_type
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.device_id
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.device_ip
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.device_port
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.device_name
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.serial_number
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.firmware
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.platform
+                    )
+                );
+
+
+                row.appendChild(
+                    createCell(
+                        record.created_at
+                    )
+                );
+
+
+                attendanceBody.appendChild(
+                    row
+                );
+
+            }
+        );
+
+    }
+
+
+    // ========================================================
+    // ADD SELECT OPTIONS
+    // ========================================================
+
+    function fillSelect(
+        elementId,
+        values,
+        defaultText
+    ) {
+
+        const select =
+            document.getElementById(
+                elementId
+            );
+
+        select.innerHTML =
+            "";
+
+        const defaultOption =
+            document.createElement(
+                "option"
+            );
+
+        defaultOption.value =
+            "";
+
+        defaultOption.textContent =
+            defaultText;
+
+        select.appendChild(
+            defaultOption
+        );
+
+
+        values.forEach(
+            function(value) {
+
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    value;
+
+                option.textContent =
+                    value;
+
+                select.appendChild(
+                    option
+                );
+
+            }
+        );
+
+    }
+
+
+    // ========================================================
+    // LOAD FILTER OPTIONS
+    // ========================================================
+
+    async function loadFilterOptions() {
+
+        try {
+
+            const response =
+                await fetch(
+                    API_URL
+                );
+
+            if (
+                !response.ok
+            ) {
+
+                return;
+
+            }
+
+            const result =
+                await response.json();
+
+
+            if (
+                result.options
+            ) {
+
+                fillSelect(
+                    "branch",
+                    result.options.branches || [],
+                    "All Branches"
+                );
+
+                fillSelect(
+                    "device_ip",
+                    result.options.device_ips || [],
+                    "All Devices"
+                );
+
+                fillSelect(
+                    "device_serial",
+                    result.options.device_serials || [],
+                    "All Serials"
+                );
+
+                fillSelect(
+                    "punch_type",
+                    result.options.punch_types || [],
+                    "All Punch Types"
+                );
+
+                fillSelect(
+                    "status",
+                    result.options.statuses || [],
+                    "All Status"
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Filter options error:",
+                error
+            );
+
+        }
+
+    }
+
+
+    // ========================================================
+    // BUILD API URL
+    // ========================================================
+
+    function buildApiUrl(
+        page
+    ) {
+
+        const params =
+            new URLSearchParams();
+
+
+        const fields =
+            filterForm.querySelectorAll(
+                "input, select"
+            );
+
+
+        fields.forEach(
+            function(field) {
+
+                if (
+                    field.value !== ""
+                ) {
+
+                    params.set(
+                        field.name,
+                        field.value
+                    );
+
+                }
+
+            }
+        );
+
+
+        params.set(
+            "page",
+            page
+        );
+
+
+        return (
+            API_URL
+            + "?"
+            + params.toString()
+        );
+
+    }
+
+
+    // ========================================================
+    // LOAD ATTENDANCE
+    // ========================================================
+
+    async function loadAttendance(
+        page = 1
+    ) {
+
+        currentPage =
+            page;
+
+
+        loadingMessage.textContent =
+            " Loading...";
+
+        loadingMessage.className =
+            "loading";
+
+
+        try {
+
+            const response =
+                await fetch(
+                    buildApiUrl(
+                        page
+                    ),
+                    {
+                        headers: {
+                            "Accept":
+                                "application/json"
+                        }
+                    }
+                );
+
+
+            const result =
+                await response.json();
+
+
+            if (
+                !response.ok
+            ) {
+
+                throw new Error(
+                    result.error ||
+                    "Failed to load attendance."
+                );
+
+            }
+
+
+            renderRecords(
+                result.data
+            );
+
+
+            totalRecordsElement.textContent =
+                Number(
+                    result.count || 0
+                ).toLocaleString();
+
+
+            const totalPages =
+                result.total_pages || 1;
+
+
+            pageInfo.textContent =
+                "Page "
+                + (
+                    result.page || 1
+                )
+                + " of "
+                + totalPages;
+
+
+            previousButton.disabled =
+                !result.previous;
+
+
+            nextButton.disabled =
+                !result.next;
+
+
+            loadingMessage.textContent =
+                " Loaded";
+
+            loadingMessage.className =
+                "loading";
+
+
+        } catch (error) {
+
+            console.error(
+                "Attendance API error:",
+                error
+            );
+
+
+            attendanceBody.innerHTML =
+                "";
+
+
+            emptyMessage.style.display =
+                "block";
+
+
+            emptyMessage.innerHTML =
+
+                "<h3>Could not load attendance data</h3>"
+                +
+                "<p>"
+                +
+                error.message
+                +
+                "</p>";
+
+
+            loadingMessage.textContent =
+                " Error";
+
+            loadingMessage.className =
+                "error-message";
+
+        }
+
+    }
+
+
+    // ========================================================
+    // FILTER SUBMIT
+    // ========================================================
+
+    filterForm.addEventListener(
+        "submit",
+        function(event) {
+
+            event.preventDefault();
+
+            loadAttendance(
+                1
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // CLEAR
+    // ========================================================
+
+    clearButton.addEventListener(
+        "click",
+        function() {
+
+            filterForm.reset();
+
+            loadAttendance(
+                1
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // PREVIOUS
+    // ========================================================
+
+    previousButton.addEventListener(
+        "click",
+        function() {
+
+            if (
+                currentPage > 1
+            ) {
+
+                loadAttendance(
+                    currentPage - 1
+                );
+
+            }
+
+        }
+    );
+
+
+    // ========================================================
+    // NEXT
+    // ========================================================
+
+    nextButton.addEventListener(
+        "click",
+        function() {
+
+            loadAttendance(
+                currentPage + 1
+            );
+
+        }
+    );
+
+
+    // ========================================================
+    // CSV
+    // ========================================================
+
+    csvButton.addEventListener(
+        "click",
+        function() {
+
+            const params =
+                new URLSearchParams();
+
+
+            const fields =
+                filterForm.querySelectorAll(
+                    "input, select"
+                );
+
+
+            fields.forEach(
+                function(field) {
+
+                    if (
+                        field.value !== ""
+                    ) {
+
+                        params.set(
+                            field.name,
+                            field.value
+                        );
+
+                    }
+
+                }
+            );
+
+
+            const url =
+                "/download.csv";
+
+            const query =
+                params.toString();
+
+
+            window.location.href =
+                query
+                    ? url + "?" + query
+                    : url;
+
+        }
+    );
+
+
+    // ========================================================
+    // INITIAL LOAD
+    // ========================================================
+
+    async function initialize() {
+
+        await loadFilterOptions();
+
+        await loadAttendance(
+            1
+        );
+
+    }
+
+
+    initialize();
+
+</script>
+
+</body>
+
+</html>
