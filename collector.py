@@ -1,7 +1,7 @@
 import time
 import signal
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from zk import ZK
 
@@ -9,8 +9,9 @@ from database import (
     create_table,
     get_active_devices,
     update_device_online,
-    update_device_offline,
-    insert_records
+    insert_records,
+    update_attendance_names,
+    make_record_hash
 )
 
 
@@ -23,8 +24,6 @@ RETRY_SECONDS = 5
 DEVICE_REFRESH_SECONDS = 10
 
 SAFETY_SYNC_MINUTES = 20
-
-ZK_TIMEOUT = 15
 
 
 # ============================================================
@@ -43,7 +42,7 @@ PUNCH_TYPES = {
 
     4: "Overtime In",
 
-    5: "Out",
+    5: "Out"
 
 }
 
@@ -63,6 +62,7 @@ def signal_handler(
     global STOP_REQUESTED
 
     print()
+
     print(
         "Stopping collector..."
     )
@@ -85,7 +85,9 @@ signal.signal(
 # DEVICE INFORMATION
 # ============================================================
 
-def get_device_information(conn):
+def get_device_information(
+    conn
+):
 
     firmware = None
 
@@ -95,8 +97,14 @@ def get_device_information(conn):
 
     platform = None
 
+    users = []
+
     users_count = 0
 
+
+    # --------------------------------------------------------
+    # Firmware
+    # --------------------------------------------------------
 
     try:
 
@@ -109,6 +117,10 @@ def get_device_information(conn):
         pass
 
 
+    # --------------------------------------------------------
+    # Serial
+    # --------------------------------------------------------
+
     try:
 
         serial = (
@@ -119,6 +131,10 @@ def get_device_information(conn):
 
         pass
 
+
+    # --------------------------------------------------------
+    # Device name
+    # --------------------------------------------------------
 
     try:
 
@@ -131,6 +147,10 @@ def get_device_information(conn):
         pass
 
 
+    # --------------------------------------------------------
+    # Platform
+    # --------------------------------------------------------
+
     try:
 
         platform = (
@@ -142,6 +162,10 @@ def get_device_information(conn):
         pass
 
 
+    # --------------------------------------------------------
+    # Users
+    # --------------------------------------------------------
+
     try:
 
         users = conn.get_users()
@@ -150,7 +174,9 @@ def get_device_information(conn):
 
     except Exception:
 
-        pass
+        users = []
+
+        users_count = 0
 
 
     return {
@@ -163,100 +189,161 @@ def get_device_information(conn):
 
         "platform": platform,
 
+        "users": users,
+
         "users_count": users_count
 
     }
 
 
 # ============================================================
-# PREPARE RECORD
+# BUILD USER MAP
+# ============================================================
+
+def build_user_map(
+    users
+):
+
+    user_map = {}
+
+
+    for user in users:
+
+        try:
+
+            user_id = getattr(
+                user,
+                "user_id",
+                None
+            )
+
+            name = getattr(
+                user,
+                "name",
+                None
+            )
+
+
+            if not user_id:
+
+                continue
+
+
+            if not name:
+
+                continue
+
+
+            name = str(
+                name
+            ).strip()
+
+
+            if not name:
+
+                continue
+
+
+            user_map[
+                str(user_id)
+            ] = name
+
+        except Exception:
+
+            continue
+
+
+    return user_map
+
+
+# ============================================================
+# PREPARE ATTENDANCE RECORD
 # ============================================================
 
 def prepare_record(
-
     attendance,
-
     device,
-
-    device_info
-
+    device_info,
+    user_map
 ):
 
     user_id = str(
-
         getattr(
-
             attendance,
-
             "user_id",
-
             ""
-
         )
-
     )
 
 
     timestamp = getattr(
-
         attendance,
-
         "timestamp",
-
         None
-
     )
 
 
     status = getattr(
-
         attendance,
-
         "status",
-
         None
-
     )
 
 
     punch = getattr(
-
         attendance,
-
         "punch",
-
         None
-
     )
 
 
     punch_type = PUNCH_TYPES.get(
-
         punch,
-
         "Unknown"
-
     )
 
 
     # --------------------------------------------------------
-    # Device ID
-    #
-    # Physical serial number is the best identifier.
-    # If serial is unavailable, use IP + port.
+    # Employee name
+    # --------------------------------------------------------
+
+    user_name = user_map.get(
+        user_id
+    )
+
+
+    # --------------------------------------------------------
+    # Stable device ID
     # --------------------------------------------------------
 
     device_id = (
-
-        device_info.get("serial")
-
-        or
-
         device.get("device_id")
+        or device_info.get("serial")
+        or device.get("ip")
+    )
 
-        or
 
-        f"{device['ip_address']}:{device['port']}"
+    serial_number = (
+        device_info.get("serial")
+        or device.get("serial_number")
+    )
+
+
+    # --------------------------------------------------------
+    # Record hash
+    # --------------------------------------------------------
+
+    record_hash = make_record_hash(
+
+        device_id,
+
+        user_id,
+
+        timestamp,
+
+        status,
+
+        punch
 
     )
 
@@ -271,17 +358,23 @@ def prepare_record(
 
         device["port"],
 
-        device_info.get("device_name"),
+        device_info.get(
+            "device_name"
+        ),
 
-        device_info.get("serial"),
+        serial_number,
 
-        device_info.get("firmware"),
+        device_info.get(
+            "firmware"
+        ),
 
-        device_info.get("platform"),
+        device_info.get(
+            "platform"
+        ),
 
         user_id,
 
-        None,
+        user_name,
 
         timestamp,
 
@@ -291,7 +384,7 @@ def prepare_record(
 
         punch_type,
 
-        str(attendance)
+        record_hash
 
     )
 
@@ -301,37 +394,34 @@ def prepare_record(
 # ============================================================
 
 def full_sync(
-
     conn,
-
     device,
-
-    device_info
-
+    device_info,
+    user_map
 ):
 
     print()
 
-    print("=" * 70)
-
     print(
-
-        f"FULL SYNC - "
-        f"{device['branch_name']}"
-
+        "=" * 70
     )
 
-    print("=" * 70)
+    print(
+        f"FULL SYNC - "
+        f"{device['branch_name']}"
+    )
+
+    print(
+        "=" * 70
+    )
 
 
     print()
 
     print(
-
         f"Device : "
         f"{device['ip_address']}:"
         f"{device['port']}"
-
     )
 
 
@@ -345,42 +435,37 @@ def full_sync(
     start_time = time.time()
 
 
-    attendances = conn.get_attendance()
-
-
-    reading_time = (
-
-        time.time()
-
-        - start_time
-
+    attendances = (
+        conn.get_attendance()
     )
 
 
-    total = len(attendances)
+    reading_time = (
+        time.time()
+        - start_time
+    )
+
+
+    total = len(
+        attendances
+    )
 
 
     print()
 
     print(
-
         f"Device records : "
         f"{total:,}"
-
     )
 
 
     print(
-
         f"Reading time   : "
         f"{reading_time:.2f} seconds"
-
     )
 
 
     if total == 0:
-
-        print()
 
         print(
             "No attendance records "
@@ -390,9 +475,9 @@ def full_sync(
         return
 
 
-    # ========================================================
-    # PREPARE
-    # ========================================================
+    # --------------------------------------------------------
+    # Prepare
+    # --------------------------------------------------------
 
     print()
 
@@ -400,76 +485,65 @@ def full_sync(
         "Preparing records..."
     )
 
-    print("--------------------------------")
+    print(
+        "--------------------------------"
+    )
 
 
     records = []
 
 
     for index, attendance in enumerate(
-
         attendances,
-
         start=1
-
     ):
 
         records.append(
-
             prepare_record(
 
                 attendance,
 
                 device,
 
-                device_info
+                device_info,
+
+                user_map
 
             )
-
         )
 
 
         if (
-
             index % 5000 == 0
-
-            or
-
-            index == total
-
+            or index == total
         ):
 
             percent = (
-
                 index / total
-
             ) * 100
 
 
             print(
-
                 f"Prepare progress: "
-                f"{index:,}/"
-                f"{total:,} "
+                f"{index:,}/{total:,} "
                 f"({percent:.1f}%)"
-
             )
 
 
-    print("--------------------------------")
-
-
     print(
-
-        f"Prepared records: "
-        f"{len(records):,}"
-
+        "--------------------------------"
     )
 
 
-    # ========================================================
-    # DATABASE
-    # ========================================================
+    print(
+        f"Prepared records: "
+        f"{len(records):,}"
+    )
+
+
+    # --------------------------------------------------------
+    # Database
+    # --------------------------------------------------------
 
     print()
 
@@ -481,70 +555,105 @@ def full_sync(
     database_start = time.time()
 
 
-    inserted, duplicates = insert_records(
-
-        records
-
+    inserted, duplicates = (
+        insert_records(
+            records
+        )
     )
 
 
     database_time = (
-
         time.time()
-
         - database_start
-
     )
 
 
+    # --------------------------------------------------------
+    # Update names in old records
+    # --------------------------------------------------------
+
+    names_updated = 0
+
+
+    if user_map:
+
+        try:
+
+            names_updated = (
+                update_attendance_names(
+
+                    device["device_id"],
+
+                    user_map
+
+                )
+            )
+
+        except Exception as error:
+
+            print()
+
+            print(
+                "Employee name update warning:"
+            )
+
+            print(
+                error
+            )
+
+
+    # --------------------------------------------------------
+    # Result
+    # --------------------------------------------------------
+
     print()
 
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
 
     print(
         "SYNC COMPLETED"
     )
 
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
 
 
     print(
-
         f"Device records : "
         f"{total:,}"
-
     )
 
 
     print(
-
         f"Prepared       : "
         f"{len(records):,}"
-
     )
 
 
     print(
-
         f"New records    : "
         f"{inserted:,}"
-
     )
 
 
     print(
-
         f"Existing       : "
         f"{duplicates:,}"
-
     )
 
 
     print(
+        f"Names updated  : "
+        f"{names_updated:,}"
+    )
 
+
+    print(
         f"Database time  : "
         f"{database_time:.2f} seconds"
-
     )
 
 
@@ -553,13 +662,10 @@ def full_sync(
 # ============================================================
 
 def save_live_record(
-
     attendance,
-
     device,
-
-    device_info
-
+    device_info,
+    user_map
 ):
 
     record = prepare_record(
@@ -568,124 +674,106 @@ def save_live_record(
 
         device,
 
-        device_info
+        device_info,
+
+        user_map
 
     )
 
 
-    try:
-
-        inserted, duplicates = insert_records(
-
+    inserted, duplicates = (
+        insert_records(
             [record]
-
         )
-
-    except Exception as error:
-
-        print()
-
-        print(
-            "LIVE DATABASE ERROR"
-        )
-
-        print(
-            f"Error : "
-            f"{type(error).__name__}"
-        )
-
-        print(
-            f"Message : "
-            f"{error}"
-        )
-
-        return
+    )
 
 
     print()
 
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
 
     print(
         "NEW ATTENDANCE"
     )
 
-    print("=" * 70)
-
-
     print(
-
-        f"Branch   : "
-        f"{device['branch_name']}"
-
+        "=" * 70
     )
 
 
     print(
+        f"Branch   : "
+        f"{device['branch_name']}"
+    )
 
+
+    print(
         f"Device   : "
         f"{device['ip_address']}:"
         f"{device['port']}"
-
     )
 
 
     print(
-
         f"Serial   : "
         f"{device_info.get('serial')}"
+    )
 
+
+    employee_id = getattr(
+        attendance,
+        "user_id",
+        ""
+    )
+
+
+    employee_name = user_map.get(
+        str(employee_id)
     )
 
 
     print(
-
         f"Employee : "
-        f"{getattr(attendance, 'user_id', '')}"
-
+        f"{employee_id}"
     )
 
 
     print(
+        f"Name     : "
+        f"{employee_name or '-'}"
+    )
 
+
+    print(
         f"Time     : "
         f"{getattr(attendance, 'timestamp', '')}"
-
     )
 
 
     print(
-
         f"Status   : "
         f"{getattr(attendance, 'status', '')}"
-
     )
 
 
     print(
-
         f"Punch    : "
         f"{getattr(attendance, 'punch', '')}"
-
     )
 
 
     punch = getattr(
-
         attendance,
-
         "punch",
-
         None
-
     )
 
 
     print(
-
         f"Type     : "
         f"{PUNCH_TYPES.get(punch, 'Unknown')}"
-
     )
 
 
@@ -707,40 +795,37 @@ def save_live_record(
 # ============================================================
 
 def live_monitor(
-
     conn,
-
     device,
-
-    device_info
-
+    device_info,
+    user_map
 ):
 
     print()
 
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
 
     print(
         "LIVE MONITORING"
     )
 
-    print("=" * 70)
-
-
     print(
-
-        f"Branch : "
-        f"{device['branch_name']}"
-
+        "=" * 70
     )
 
 
     print(
+        f"Branch : "
+        f"{device['branch_name']}"
+    )
 
+
+    print(
         f"Device : "
         f"{device['ip_address']}:"
         f"{device['port']}"
-
     )
 
 
@@ -752,37 +837,29 @@ def live_monitor(
 
 
     print(
-
         f"Safety full sync after "
-        f"{SAFETY_SYNC_MINUTES} "
-        f"minutes without live event."
-
+        f"{SAFETY_SYNC_MINUTES} minutes "
+        f"without live event."
     )
 
 
     print()
 
 
-    # --------------------------------------------------------
-    # pyzk live_capture() does not support callback=.
-    #
-    # It is a generator.
-    #
-    # We therefore run it directly.
-    # --------------------------------------------------------
-
-    last_event_time = time.time()
+    last_event = datetime.now()
 
 
     while not STOP_REQUESTED:
 
         try:
 
-            for attendance in conn.live_capture():
+            for attendance in (
+                conn.live_capture()
+            ):
 
                 if STOP_REQUESTED:
 
-                    return
+                    return False
 
 
                 if attendance is None:
@@ -790,85 +867,103 @@ def live_monitor(
                     continue
 
 
-                # ------------------------------------------------
-                # New live attendance received
-                # ------------------------------------------------
-
                 save_live_record(
 
                     attendance,
 
                     device,
 
-                    device_info
+                    device_info,
+
+                    user_map
 
                 )
 
 
-                # ------------------------------------------------
-                # Reset 20-minute safety timer
-                # ------------------------------------------------
-
-                last_event_time = time.time()
+                last_event = datetime.now()
 
 
                 print()
 
                 print(
-
-                    "Live event received."
-                    " Safety timer reset."
-
+                    "Live event received. "
+                    "Safety timer reset."
                 )
 
 
-                # ------------------------------------------------
-                # Stop live capture temporarily.
-                #
-                # The outer device loop will check whether
-                # 20 minutes have passed and can perform a
-                # full sync.
-                # ------------------------------------------------
+        except Exception as error:
 
-                break
+            print()
 
+            print(
+                "=" * 70
+            )
 
-            # ----------------------------------------------------
-            # Check safety timer
-            # ----------------------------------------------------
+            print(
+                "LIVE CAPTURE ERROR"
+            )
 
-            elapsed = (
-
-                time.time()
-
-                - last_event_time
-
+            print(
+                "=" * 70
             )
 
 
-            if (
+            print(
+                f"Branch : "
+                f"{device['branch_name']}"
+            )
 
-                elapsed
 
-                >=
+            print(
+                f"Device : "
+                f"{device['ip_address']}:"
+                f"{device['port']}"
+            )
 
-                SAFETY_SYNC_MINUTES * 60
 
-            ):
+            print(
+                f"Error  : "
+                f"{type(error).__name__}"
+            )
 
-                print()
 
-                print(
+            print(
+                f"Message: "
+                f"{error}"
+            )
 
-                    f"No live event for "
-                    f"{SAFETY_SYNC_MINUTES} "
-                    f"minutes."
 
-                )
+            return False
 
-                print(
-                    "Starting safety full sync..."
-                )
+
+        # ----------------------------------------------------
+        # Safety sync
+        # ----------------------------------------------------
+
+        elapsed = (
+            datetime.now()
+            - last_event
+        )
+
+
+        if elapsed >= timedelta(
+            minutes=SAFETY_SYNC_MINUTES
+        ):
+
+            print()
+
+            print(
+                "No live attendance received "
+                f"for {SAFETY_SYNC_MINUTES} minutes."
+            )
+
+
+            print(
+                "Running safety full sync..."
+            )
+
+
+            try:
 
                 full_sync(
 
@@ -876,55 +971,60 @@ def live_monitor(
 
                     device,
 
-                    device_info
+                    device_info,
+
+                    user_map
 
                 )
 
 
-                last_event_time = time.time()
+                last_event = (
+                    datetime.now()
+                )
 
 
-            else:
+            except Exception as error:
 
-                # Small delay before starting another
-                # live_capture session.
+                print(
+                    "Safety sync error:"
+                )
 
-                time.sleep(1)
+                print(
+                    error
+                )
 
 
-        except Exception as error:
-
-            raise error
+    return True
 
 
 # ============================================================
-# CONNECT TO DEVICE
+# CONNECT DEVICE
 # ============================================================
 
-def connect_device(device):
+def connect_device(
+    device
+):
 
     print()
 
-    print("=" * 70)
-
     print(
-
-        f"DEVICE - "
-        f"{device['branch_name']}"
-
+        "=" * 70
     )
 
-    print("=" * 70)
-
-
-    print()
+    print(
+        f"DEVICE - "
+        f"{device['branch_name']}"
+    )
 
     print(
+        "=" * 70
+    )
 
+
+    print(
         f"Connecting to "
         f"{device['ip_address']}:"
         f"{device['port']}"
-
     )
 
 
@@ -934,7 +1034,7 @@ def connect_device(device):
 
         port=device["port"],
 
-        timeout=ZK_TIMEOUT,
+        timeout=10,
 
         password=0,
 
@@ -951,11 +1051,9 @@ def connect_device(device):
     print()
 
     print(
-
         f"CONNECTED: "
         f"{device['ip_address']}:"
         f"{device['port']}"
-
     )
 
 
@@ -963,10 +1061,12 @@ def connect_device(device):
 
 
 # ============================================================
-# PROCESS ONE DEVICE
+# RUN ONE DEVICE
 # ============================================================
 
-def process_device(device):
+def run_device(
+    device
+):
 
     zk = None
 
@@ -975,103 +1075,104 @@ def process_device(device):
 
     try:
 
-        zk, conn = connect_device(device)
+        zk, conn = connect_device(
+            device
+        )
 
 
         # ----------------------------------------------------
         # Device information
         # ----------------------------------------------------
 
-        device_info = get_device_information(
-
-            conn
-
+        device_info = (
+            get_device_information(
+                conn
+            )
         )
 
 
         print(
-
             f"Serial   : "
             f"{device_info.get('serial')}"
-
         )
 
 
         print(
-
             f"Firmware : "
             f"{device_info.get('firmware')}"
-
         )
 
 
         print(
-
             f"Device   : "
             f"{device_info.get('device_name')}"
-
         )
 
 
         print(
-
             f"Platform : "
             f"{device_info.get('platform')}"
-
         )
 
 
         print(
-
             f"Users    : "
             f"{device_info.get('users_count')}"
-
         )
 
 
         # ----------------------------------------------------
-        # Device ID
+        # Build employee map
         # ----------------------------------------------------
 
-        actual_device_id = (
+        user_map = build_user_map(
+            device_info.get(
+                "users",
+                []
+            )
+        )
 
-            device_info.get("serial")
 
-            or
-
-            device["device_id"]
-
+        print(
+            f"Employee names loaded: "
+            f"{len(user_map):,}"
         )
 
 
         # ----------------------------------------------------
-        # Update device information
+        # Update device database
         # ----------------------------------------------------
 
-        update_device_online(
+        device_id = (
+            device.get("device_id")
+            or device_info.get("serial")
+        )
 
-            actual_device_id,
 
-            device_name=device_info.get(
-                "device_name"
-            ),
+        if device_id:
 
-            serial_number=device_info.get(
-                "serial"
-            ),
+            update_device_online(
 
-            firmware=device_info.get(
-                "firmware"
-            ),
+                device_id,
 
-            platform=device_info.get(
-                "platform"
+                device_name=device_info.get(
+                    "device_name"
+                ),
+
+                serial_number=device_info.get(
+                    "serial"
+                ),
+
+                firmware=device_info.get(
+                    "firmware"
+                ),
+
+                platform=device_info.get(
+                    "platform"
+                )
+
             )
 
-        )
-
-
-        print()
 
         print(
             "Device database status: ONLINE"
@@ -1088,13 +1189,15 @@ def process_device(device):
 
             device,
 
-            device_info
+            device_info,
+
+            user_map
 
         )
 
 
         # ----------------------------------------------------
-        # Live monitor
+        # Live monitoring
         # ----------------------------------------------------
 
         live_monitor(
@@ -1103,7 +1206,9 @@ def process_device(device):
 
             device,
 
-            device_info
+            device_info,
+
+            user_map
 
         )
 
@@ -1112,77 +1217,50 @@ def process_device(device):
 
         print()
 
-        print("=" * 70)
+        print(
+            "=" * 70
+        )
 
         print(
             "DEVICE ERROR"
         )
 
-        print("=" * 70)
-
-
         print(
-
-            f"Branch : "
-            f"{device['branch_name']}"
-
+            "=" * 70
         )
 
 
         print(
+            f"Branch : "
+            f"{device['branch_name']}"
+        )
 
+
+        print(
             f"Device : "
             f"{device['ip_address']}:"
             f"{device['port']}"
-
         )
 
 
         print(
-
             f"Error  : "
             f"{type(error).__name__}"
-
         )
 
 
         print(
-
             f"Message: "
             f"{error}"
-
         )
 
 
         print()
 
         print(
-            "Device is offline or connection was lost."
+            "Device is offline "
+            "or connection was lost."
         )
-
-
-        try:
-
-            device_id = (
-
-                device.get("device_id")
-
-            )
-
-            if device_id:
-
-                update_device_offline(
-
-                    device_id
-
-                )
-
-        except Exception:
-
-            pass
-
-
-        return False
 
 
     finally:
@@ -1202,34 +1280,161 @@ def process_device(device):
                 pass
 
 
-        return True
-
-
 # ============================================================
 # DEVICE MANAGER
 # ============================================================
 
 def device_manager():
 
-    print()
-
-    print("=" * 70)
-
-    print(
-        "DEVICE MANAGER STARTED"
-    )
-
-    print("=" * 70)
-
-
-    processed_devices = {}
+    active_devices = {}
 
 
     while not STOP_REQUESTED:
 
         try:
 
-            devices = get_active_devices()
+            devices = (
+                get_active_devices()
+            )
+
+
+            current_ids = {
+                device["device_id"]
+                for device in devices
+            }
+
+
+            # ------------------------------------------------
+            # Detect newly active devices
+            # ------------------------------------------------
+
+            for device in devices:
+
+                device_id = (
+                    device["device_id"]
+                )
+
+
+                if device_id not in active_devices:
+
+                    print()
+
+                    print(
+                        "=" * 70
+                    )
+
+                    print(
+                        "NEW ACTIVE DEVICE DETECTED"
+                    )
+
+                    print(
+                        f"Branch : "
+                        f"{device['branch_name']}"
+                    )
+
+                    print(
+                        f"Device : "
+                        f"{device['ip_address']}:"
+                        f"{device['port']}"
+                    )
+
+                    print(
+                        "=" * 70
+                    )
+
+
+                    active_devices[
+                        device_id
+                    ] = device
+
+
+            # ------------------------------------------------
+            # Remove inactive devices
+            # ------------------------------------------------
+
+            removed = (
+                set(active_devices.keys())
+                - current_ids
+            )
+
+
+            for device_id in removed:
+
+                print()
+
+                print(
+                    "=" * 70
+                )
+
+                print(
+                    "DEVICE NO LONGER ACTIVE"
+                )
+
+                print(
+                    f"Device ID: "
+                    f"{device_id}"
+                )
+
+                print(
+                    "=" * 70
+                )
+
+
+                del active_devices[
+                    device_id
+                ]
+
+
+            # ------------------------------------------------
+            # Run active devices
+            #
+            # This version processes devices one by one.
+            # ------------------------------------------------
+
+            for device in list(
+                active_devices.values()
+            ):
+
+                if STOP_REQUESTED:
+
+                    break
+
+
+                run_device(
+                    device
+                )
+
+
+                if STOP_REQUESTED:
+
+                    break
+
+
+                print()
+
+                print(
+                    f"Waiting "
+                    f"{RETRY_SECONDS} seconds "
+                    f"before retry..."
+                )
+
+
+                for _ in range(
+                    RETRY_SECONDS
+                ):
+
+                    if STOP_REQUESTED:
+
+                        break
+
+                    time.sleep(1)
+
+
+            if not active_devices:
+
+                time.sleep(
+                    DEVICE_REFRESH_SECONDS
+                )
 
 
         except Exception as error:
@@ -1237,175 +1442,32 @@ def device_manager():
             print()
 
             print(
-                "DATABASE ERROR"
+                "=" * 70
             )
 
             print(
-                f"{type(error).__name__}: "
+                "DEVICE MANAGER ERROR"
+            )
+
+            print(
+                "=" * 70
+            )
+
+
+            print(
+                f"Error: "
+                f"{type(error).__name__}"
+            )
+
+
+            print(
+                f"Message: "
                 f"{error}"
             )
 
-            time.sleep(
-
-                DEVICE_REFRESH_SECONDS
-
-            )
-
-            continue
-
-
-        if not devices:
-
-            print()
-
-            print(
-                "WARNING: No active devices "
-                "found in zkt_devices."
-            )
-
-            print(
-                "Add a device from the "
-                "Devices page."
-            )
 
             time.sleep(
-
                 DEVICE_REFRESH_SECONDS
-
-            )
-
-            continue
-
-
-        for device in devices:
-
-            if STOP_REQUESTED:
-
-                break
-
-
-            device_key = device["device_id"]
-
-
-            # ------------------------------------------------
-            # New device
-            # ------------------------------------------------
-
-            if device_key not in processed_devices:
-
-                print()
-
-                print("=" * 70)
-
-                print(
-                    "NEW ACTIVE DEVICE DETECTED"
-                )
-
-                print(
-
-                    f"Branch : "
-                    f"{device['branch_name']}"
-
-                )
-
-                print(
-
-                    f"Device : "
-                    f"{device['ip_address']}:"
-                    f"{device['port']}"
-
-                )
-
-                print("=" * 70)
-
-
-                processed_devices[
-                    device_key
-                ] = {
-
-                    "last_attempt":
-                    0
-
-                }
-
-
-            # ------------------------------------------------
-            # Process device
-            # ------------------------------------------------
-
-            last_attempt = processed_devices[
-                device_key
-            ]["last_attempt"]
-
-
-            if (
-
-                time.time()
-
-                - last_attempt
-
-                <
-
-                RETRY_SECONDS
-
-            ):
-
-                continue
-
-
-            processed_devices[
-                device_key
-            ]["last_attempt"] = time.time()
-
-
-            success = process_device(
-
-                device
-
-            )
-
-
-            if not success:
-
-                print()
-
-                print(
-
-                    f"Retrying "
-                    f"{device['branch_name']} "
-                    f"in "
-                    f"{RETRY_SECONDS} seconds..."
-
-                )
-
-
-            if success:
-
-                # ------------------------------------------------
-                # process_device() returns after:
-                #
-                # - connection lost
-                # - live monitor ended
-                # - error
-                #
-                # We then retry.
-                # ------------------------------------------------
-
-                processed_devices[
-                    device_key
-                ]["last_attempt"] = time.time()
-
-
-        # ----------------------------------------------------
-        # Refresh active device list
-        # ----------------------------------------------------
-
-        if not STOP_REQUESTED:
-
-            time.sleep(
-
-                DEVICE_REFRESH_SECONDS
-
             )
 
 
@@ -1415,90 +1477,111 @@ def device_manager():
 
 def main():
 
-    print()
-
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
 
     print(
         "ZKTeco MULTI DEVICE COLLECTOR"
     )
 
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
+
 
     print()
 
-
-    # --------------------------------------------------------
-    # Database initialization
-    # --------------------------------------------------------
 
     create_table()
 
 
     try:
 
-        devices = get_active_devices()
+        devices = (
+            get_active_devices()
+        )
 
         print(
-
             f"Configured active devices : "
             f"{len(devices)}"
-
         )
+
+    except Exception:
+
+        print(
+            "Configured active devices : 0"
+        )
+
+
+    print(
+        f"Device retry interval     : "
+        f"{RETRY_SECONDS} seconds"
+    )
+
+
+    print(
+        f"Device refresh interval   : "
+        f"{DEVICE_REFRESH_SECONDS} seconds"
+    )
+
+
+    print(
+        f"Safety full sync          : "
+        f"{SAFETY_SYNC_MINUTES} minutes"
+    )
+
+
+    print()
+
+
+    try:
+
+        devices = (
+            get_active_devices()
+        )
+
+
+        if not devices:
+
+            print(
+                "WARNING: No active devices "
+                "found in zkt_devices."
+            )
+
+
+            print(
+                "Add a device from the Devices page."
+            )
+
 
     except Exception as error:
 
-        print()
-
         print(
-            "Could not read devices."
+            "Could not read active devices:"
         )
 
         print(
-            f"{type(error).__name__}: "
-            f"{error}"
+            error
         )
 
-        return
 
+    print()
 
     print(
+        "=" * 70
+    )
 
-        f"Device retry interval     : "
-        f"{RETRY_SECONDS} seconds"
+    print(
+        "DEVICE MANAGER STARTED"
+    )
 
+    print(
+        "=" * 70
     )
 
 
-    print(
-
-        f"Device refresh interval   : "
-        f"{DEVICE_REFRESH_SECONDS} seconds"
-
-    )
-
-
-    print(
-
-        f"Safety full sync          : "
-        f"{SAFETY_SYNC_MINUTES} minutes"
-
-    )
-
-
-    if not devices:
-
-        print()
-
-        print(
-            "WARNING: No active devices "
-            "found in zkt_devices."
-        )
-
-        print(
-            "Add a device from the "
-            "Devices page."
-        )
+    print()
 
 
     device_manager()
@@ -1507,7 +1590,15 @@ def main():
     print()
 
     print(
-        "Collector stopped."
+        "=" * 70
+    )
+
+    print(
+        "COLLECTOR STOPPED"
+    )
+
+    print(
+        "=" * 70
     )
 
 

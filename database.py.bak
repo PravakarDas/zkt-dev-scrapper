@@ -1,0 +1,107 @@
+# ============================================================
+# UPDATE ATTENDANCE EMPLOYEE NAMES
+# ============================================================
+
+def update_attendance_names(
+    device_id,
+    user_map
+):
+
+    if not user_map:
+
+        return 0
+
+
+    updated = 0
+
+
+    with get_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            for user_id, user_name in user_map.items():
+
+                if not user_id:
+
+                    continue
+
+
+                if not user_name:
+
+                    continue
+
+
+                cur.execute(
+                    f"""
+                    UPDATE {ATTENDANCE_TABLE}
+
+                    SET
+                        user_name = %s
+
+                    WHERE
+                        device_id = %s
+
+                        AND user_id = %s
+
+                        AND (
+                            user_name IS NULL
+
+                            OR user_name = ''
+
+                        )
+                    """,
+                    (
+                        user_name,
+                        device_id,
+                        str(user_id)
+                    )
+                )
+
+
+                updated += cur.rowcount
+
+
+        conn.commit()
+
+
+    return updated
+
+# ============================================================
+# GET ACTIVE DEVICES
+# ============================================================
+
+def get_active_devices():
+
+    query = f"""
+        SELECT
+            device_id,
+            branch_name,
+            ip_address,
+            port,
+            device_name,
+            serial_number,
+            firmware,
+            platform,
+            status,
+            first_seen,
+            last_seen,
+            created_at,
+            updated_at
+
+        FROM {DEVICE_TABLE}
+
+        WHERE status = 'active'
+
+        ORDER BY id ASC
+    """
+
+
+    with get_dict_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            cur.execute(
+                query
+            )
+
+            return cur.fetchall()

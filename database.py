@@ -1,11 +1,17 @@
+import hashlib
+
 import psycopg
 from psycopg.rows import dict_row
-
 
 from config import DATABASE_URL
 
 
+# ============================================================
+# TABLE NAMES
+# ============================================================
+
 ATTENDANCE_TABLE = "zkt_attendance"
+
 DEVICE_TABLE = "zkt_devices"
 
 
@@ -31,157 +37,149 @@ def get_dict_connection():
 
 
 # ============================================================
-# CREATE / INITIALIZE TABLES
+# DATABASE INITIALIZATION
 # ============================================================
 
 def create_table():
-
-    query = f"""
-
-    CREATE TABLE IF NOT EXISTS {ATTENDANCE_TABLE} (
-
-        id BIGSERIAL PRIMARY KEY,
-
-        device_id TEXT,
-
-        branch_name TEXT NOT NULL,
-
-        device_ip TEXT NOT NULL,
-        device_port INTEGER,
-
-        device_name TEXT,
-        serial_number TEXT,
-        firmware TEXT,
-        platform TEXT,
-
-        user_id TEXT NOT NULL,
-        user_name TEXT,
-
-        attendance_time TIMESTAMP NOT NULL,
-
-        status INTEGER,
-        punch INTEGER,
-        punch_type TEXT,
-
-        record_hash TEXT,
-
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-
-    );
-
-
-    CREATE INDEX IF NOT EXISTS
-    idx_zkt_attendance_time
-
-    ON {ATTENDANCE_TABLE}(attendance_time);
-
-
-    CREATE INDEX IF NOT EXISTS
-    idx_zkt_attendance_user
-
-    ON {ATTENDANCE_TABLE}(user_id);
-
-
-    CREATE INDEX IF NOT EXISTS
-    idx_zkt_attendance_device
-
-    ON {ATTENDANCE_TABLE}(device_id);
-
-
-    CREATE INDEX IF NOT EXISTS
-    idx_zkt_attendance_branch
-
-    ON {ATTENDANCE_TABLE}(branch_name);
-
-
-    CREATE TABLE IF NOT EXISTS {DEVICE_TABLE} (
-
-        id BIGSERIAL PRIMARY KEY,
-
-        device_id TEXT UNIQUE NOT NULL,
-
-        branch_name TEXT NOT NULL,
-
-        ip_address TEXT NOT NULL,
-
-        port INTEGER NOT NULL DEFAULT 4370,
-
-        device_name TEXT,
-
-        serial_number TEXT,
-
-        firmware TEXT,
-
-        platform TEXT,
-
-        status TEXT NOT NULL DEFAULT 'active',
-
-        first_seen TIMESTAMPTZ,
-
-        last_seen TIMESTAMPTZ,
-
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-
-    );
-
-
-    CREATE INDEX IF NOT EXISTS
-    idx_zkt_devices_status
-
-    ON {DEVICE_TABLE}(status);
-
-
-    CREATE INDEX IF NOT EXISTS
-    idx_zkt_devices_ip
-
-    ON {DEVICE_TABLE}(ip_address);
-
-    """
 
     with get_connection() as conn:
 
         with conn.cursor() as cur:
 
-            cur.execute(query)
-
             # ------------------------------------------------
-            # Make sure attendance unique constraint exists.
-            #
-            # This is needed because the table may already
-            # exist from an older version of the project.
+            # ATTENDANCE TABLE
             # ------------------------------------------------
 
-            cur.execute(
-                f"""
-                SELECT 1
-                FROM pg_constraint
-                WHERE conname =
-                'zkt_attendance_device_record_unique'
-                """
-            )
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {ATTENDANCE_TABLE} (
 
-            constraint_exists = cur.fetchone()
+                    id BIGSERIAL PRIMARY KEY,
 
-            if not constraint_exists:
+                    device_id TEXT NOT NULL,
 
-                cur.execute(
-                    f"""
-                    ALTER TABLE {ATTENDANCE_TABLE}
+                    branch_name TEXT NOT NULL,
 
-                    ADD CONSTRAINT
-                    zkt_attendance_device_record_unique
+                    device_ip TEXT NOT NULL,
+                    device_port INTEGER,
 
-                    UNIQUE (
-                        device_id,
-                        user_id,
-                        attendance_time,
-                        status,
-                        punch
-                    )
-                    """
+                    device_name TEXT,
+
+                    serial_number TEXT,
+
+                    firmware TEXT,
+
+                    platform TEXT,
+
+                    user_id TEXT NOT NULL,
+
+                    user_name TEXT,
+
+                    attendance_time TIMESTAMP NOT NULL,
+
+                    status INTEGER,
+
+                    punch INTEGER,
+
+                    punch_type TEXT,
+
+                    record_hash TEXT UNIQUE,
+
+                    created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
                 )
+            """)
+
+            # ------------------------------------------------
+            # DEVICE TABLE
+            # ------------------------------------------------
+
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {DEVICE_TABLE} (
+
+                    id BIGSERIAL PRIMARY KEY,
+
+                    device_id TEXT NOT NULL UNIQUE,
+
+                    branch_name TEXT NOT NULL,
+
+                    ip_address TEXT NOT NULL,
+
+                    port INTEGER NOT NULL,
+
+                    device_name TEXT,
+
+                    serial_number TEXT,
+
+                    firmware TEXT,
+
+                    platform TEXT,
+
+                    status TEXT NOT NULL
+                    DEFAULT 'active',
+
+                    first_seen TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                    last_seen TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                    created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP,
+
+                    updated_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # ------------------------------------------------
+            # ATTENDANCE INDEXES
+            # ------------------------------------------------
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_attendance_device
+                ON {ATTENDANCE_TABLE}(device_id)
+            """)
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_attendance_user
+                ON {ATTENDANCE_TABLE}(user_id)
+            """)
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_attendance_time
+                ON {ATTENDANCE_TABLE}(attendance_time)
+            """)
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_attendance_branch
+                ON {ATTENDANCE_TABLE}(branch_name)
+            """)
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_attendance_record_hash
+                ON {ATTENDANCE_TABLE}(record_hash)
+            """)
+
+            # ------------------------------------------------
+            # DEVICE INDEXES
+            # ------------------------------------------------
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_devices_status
+                ON {DEVICE_TABLE}(status)
+            """)
+
+            cur.execute(f"""
+                CREATE INDEX IF NOT EXISTS
+                idx_zkt_devices_ip
+                ON {DEVICE_TABLE}(ip_address)
+            """)
 
         conn.commit()
 
@@ -195,9 +193,7 @@ def create_table():
 def get_all_devices():
 
     query = f"""
-
         SELECT
-
             id,
             device_id,
             branch_name,
@@ -216,7 +212,6 @@ def get_all_devices():
         FROM {DEVICE_TABLE}
 
         ORDER BY id ASC
-
     """
 
     with get_dict_connection() as conn:
@@ -231,9 +226,7 @@ def get_all_devices():
 def get_active_devices():
 
     query = f"""
-
         SELECT
-
             id,
             device_id,
             branch_name,
@@ -245,14 +238,15 @@ def get_active_devices():
             platform,
             status,
             first_seen,
-            last_seen
+            last_seen,
+            created_at,
+            updated_at
 
         FROM {DEVICE_TABLE}
 
         WHERE status = 'active'
 
         ORDER BY id ASC
-
     """
 
     with get_dict_connection() as conn:
@@ -267,15 +261,27 @@ def get_active_devices():
 def get_device(device_id):
 
     query = f"""
-
-        SELECT *
+        SELECT
+            id,
+            device_id,
+            branch_name,
+            ip_address,
+            port,
+            device_name,
+            serial_number,
+            firmware,
+            platform,
+            status,
+            first_seen,
+            last_seen,
+            created_at,
+            updated_at
 
         FROM {DEVICE_TABLE}
 
         WHERE device_id = %s
 
         LIMIT 1
-
     """
 
     with get_dict_connection() as conn:
@@ -296,17 +302,29 @@ def get_device_by_ip(
 ):
 
     query = f"""
-
-        SELECT *
+        SELECT
+            id,
+            device_id,
+            branch_name,
+            ip_address,
+            port,
+            device_name,
+            serial_number,
+            firmware,
+            platform,
+            status,
+            first_seen,
+            last_seen,
+            created_at,
+            updated_at
 
         FROM {DEVICE_TABLE}
 
-        WHERE ip_address = %s
-
-        AND port = %s
+        WHERE
+            ip_address = %s
+            AND port = %s
 
         LIMIT 1
-
     """
 
     with get_dict_connection() as conn:
@@ -324,43 +342,44 @@ def get_device_by_ip(
             return cur.fetchone()
 
 
-# ============================================================
-# ADD DEVICE
-# ============================================================
-
 def add_device(
-
     device_id,
     branch_name,
     ip_address,
     port,
-    device_name=None,
-    serial_number=None,
-    firmware=None,
-    platform=None
-
+    device_name,
+    serial_number,
+    firmware,
+    platform
 ):
 
     query = f"""
-
         INSERT INTO {DEVICE_TABLE} (
 
             device_id,
+
             branch_name,
+
             ip_address,
+
             port,
 
             device_name,
+
             serial_number,
+
             firmware,
+
             platform,
 
             status,
 
             first_seen,
+
             last_seen,
 
             created_at,
+
             updated_at
 
         )
@@ -371,7 +390,6 @@ def add_device(
             %s,
             %s,
             %s,
-
             %s,
             %s,
             %s,
@@ -380,15 +398,16 @@ def add_device(
             'active',
 
             CURRENT_TIMESTAMP,
+
             CURRENT_TIMESTAMP,
 
             CURRENT_TIMESTAMP,
+
             CURRENT_TIMESTAMP
 
         )
 
         RETURNING *
-
     """
 
     with get_dict_connection() as conn:
@@ -396,21 +415,17 @@ def add_device(
         with conn.cursor() as cur:
 
             cur.execute(
-
                 query,
-
                 (
                     device_id,
                     branch_name,
                     ip_address,
                     port,
-
                     device_name,
                     serial_number,
                     firmware,
                     platform
                 )
-
             )
 
             result = cur.fetchone()
@@ -420,21 +435,14 @@ def add_device(
     return result
 
 
-# ============================================================
-# UPDATE DEVICE
-# ============================================================
-
 def update_device(
-
     device_id,
     branch_name,
     ip_address,
     port
-
 ):
 
     query = f"""
-
         UPDATE {DEVICE_TABLE}
 
         SET
@@ -445,13 +453,11 @@ def update_device(
 
             port = %s,
 
-            updated_at =
-            CURRENT_TIMESTAMP
+            updated_at = CURRENT_TIMESTAMP
 
         WHERE device_id = %s
 
         RETURNING *
-
     """
 
     with get_dict_connection() as conn:
@@ -459,16 +465,13 @@ def update_device(
         with conn.cursor() as cur:
 
             cur.execute(
-
                 query,
-
                 (
                     branch_name,
                     ip_address,
                     port,
                     device_id
                 )
-
             )
 
             result = cur.fetchone()
@@ -478,27 +481,20 @@ def update_device(
     return result
 
 
-# ============================================================
-# DEACTIVATE DEVICE
-# ============================================================
-
 def deactivate_device(device_id):
 
     query = f"""
-
         UPDATE {DEVICE_TABLE}
 
         SET
 
             status = 'inactive',
 
-            updated_at =
-            CURRENT_TIMESTAMP
+            updated_at = CURRENT_TIMESTAMP
 
         WHERE device_id = %s
 
         RETURNING *
-
     """
 
     with get_dict_connection() as conn:
@@ -517,27 +513,20 @@ def deactivate_device(device_id):
     return result
 
 
-# ============================================================
-# ACTIVATE DEVICE
-# ============================================================
-
 def activate_device(device_id):
 
     query = f"""
-
         UPDATE {DEVICE_TABLE}
 
         SET
 
             status = 'active',
 
-            updated_at =
-            CURRENT_TIMESTAMP
+            updated_at = CURRENT_TIMESTAMP
 
         WHERE device_id = %s
 
         RETURNING *
-
     """
 
     with get_dict_connection() as conn:
@@ -556,52 +545,38 @@ def activate_device(device_id):
     return result
 
 
-# ============================================================
-# DEVICE ONLINE UPDATE
-# ============================================================
-
 def update_device_online(
-
     device_id,
-
     device_name=None,
-
     serial_number=None,
-
     firmware=None,
-
     platform=None
-
 ):
 
     query = f"""
-
         UPDATE {DEVICE_TABLE}
 
         SET
 
             device_name =
-            COALESCE(%s, device_name),
+                COALESCE(%s, device_name),
 
             serial_number =
-            COALESCE(%s, serial_number),
+                COALESCE(%s, serial_number),
 
             firmware =
-            COALESCE(%s, firmware),
+                COALESCE(%s, firmware),
 
             platform =
-            COALESCE(%s, platform),
+                COALESCE(%s, platform),
 
             status = 'active',
 
-            last_seen =
-            CURRENT_TIMESTAMP,
+            last_seen = CURRENT_TIMESTAMP,
 
-            updated_at =
-            CURRENT_TIMESTAMP
+            updated_at = CURRENT_TIMESTAMP
 
         WHERE device_id = %s
-
     """
 
     with get_connection() as conn:
@@ -609,9 +584,7 @@ def update_device_online(
         with conn.cursor() as cur:
 
             cur.execute(
-
                 query,
-
                 (
                     device_name,
                     serial_number,
@@ -619,47 +592,38 @@ def update_device_online(
                     platform,
                     device_id
                 )
-
             )
 
         conn.commit()
 
 
 # ============================================================
-# DEVICE OFFLINE UPDATE
+# RECORD HASH
 # ============================================================
 
-def update_device_offline(device_id):
+def make_record_hash(
+    device_id,
+    user_id,
+    attendance_time,
+    status,
+    punch
+):
 
-    query = f"""
+    value = "|".join([
+        str(device_id or ""),
+        str(user_id or ""),
+        str(attendance_time or ""),
+        str(status if status is not None else ""),
+        str(punch if punch is not None else "")
+    ])
 
-        UPDATE {DEVICE_TABLE}
-
-        SET
-
-            status = 'offline',
-
-            updated_at =
-            CURRENT_TIMESTAMP
-
-        WHERE device_id = %s
-
-    """
-
-    with get_connection() as conn:
-
-        with conn.cursor() as cur:
-
-            cur.execute(
-                query,
-                (device_id,)
-            )
-
-        conn.commit()
+    return hashlib.sha256(
+        value.encode("utf-8")
+    ).hexdigest()
 
 
 # ============================================================
-# BULK ATTENDANCE INSERT
+# ATTENDANCE BULK INSERT
 # ============================================================
 
 def insert_records(records):
@@ -668,32 +632,21 @@ def insert_records(records):
 
         return 0, 0
 
-
     total = len(records)
 
-
     print()
-    print(
-        "Preparing PostgreSQL bulk insert..."
-    )
-
-    print(
-        f"Records to process: "
-        f"{total:,}"
-    )
-
+    print("Preparing PostgreSQL bulk insert...")
+    print(f"Records to process: {total:,}")
 
     with get_connection() as conn:
 
         with conn.cursor() as cur:
 
             # ------------------------------------------------
-            # Temporary staging table
+            # TEMPORARY TABLE
             # ------------------------------------------------
 
-            cur.execute(
-                """
-
+            cur.execute("""
                 CREATE TEMP TABLE
                 zkteco_attendance_stage (
 
@@ -729,23 +682,18 @@ def insert_records(records):
 
                 )
 
-                ON COMMIT DROP;
-
-                """
-            )
-
+                ON COMMIT DROP
+            """)
 
             print(
                 "Temporary staging table created."
             )
 
-
             # ------------------------------------------------
-            # COPY data
+            # COPY
             # ------------------------------------------------
 
             copy_sql = """
-
                 COPY zkteco_attendance_stage (
 
                     device_id,
@@ -781,71 +729,26 @@ def insert_records(records):
                 )
 
                 FROM STDIN
-
-                WITH (
-                    FORMAT CSV,
-                    DELIMITER E'\\t',
-                    NULL '\\N'
-                )
-
             """
-
 
             print()
             print(
                 "Uploading records to PostgreSQL..."
             )
-
             print("--------------------------------")
-
 
             with cur.copy(copy_sql) as copy:
 
                 for index, record in enumerate(
-
                     records,
-
                     start=1
-
                 ):
 
-                    values = []
-
-                    for value in record:
-
-                        if value is None:
-
-                            values.append("\\N")
-
-                        else:
-
-                            value = str(value)
-
-                            value = (
-                                value
-                                .replace("\\", "\\\\")
-                                .replace("\t", " ")
-                                .replace("\n", " ")
-                                .replace("\r", " ")
-                            )
-
-                            values.append(value)
-
-
-                    line = (
-                        "\t".join(values)
-                        + "\n"
-                    )
-
-                    copy.write(line)
-
+                    copy.write_row(record)
 
                     if (
-
                         index % 5000 == 0
-
                         or index == total
-
                     ):
 
                         percent = (
@@ -853,24 +756,28 @@ def insert_records(records):
                         ) * 100
 
                         print(
-
                             f"Upload progress: "
-                            f"{index:,}/"
-                            f"{total:,} "
+                            f"{index:,}/{total:,} "
                             f"({percent:.1f}%)"
-
                         )
 
-
             print("--------------------------------")
-
-            print(
-                "Upload completed."
-            )
-
+            print("Upload completed.")
 
             # ------------------------------------------------
-            # Move into main table
+            # INSERT
+            #
+            # The composite UNIQUE constraint already exists
+            # in your current database:
+            #
+            # UNIQUE (
+            #     device_id,
+            #     user_id,
+            #     attendance_time,
+            #     status,
+            #     punch
+            # )
+            #
             # ------------------------------------------------
 
             print()
@@ -878,11 +785,7 @@ def insert_records(records):
                 "Moving records into main table..."
             )
 
-
-            cur.execute(
-
-                f"""
-
+            cur.execute(f"""
                 INSERT INTO {ATTENDANCE_TABLE} (
 
                     device_id,
@@ -952,60 +855,133 @@ def insert_records(records):
                 FROM zkteco_attendance_stage
 
                 ON CONFLICT (
-
                     device_id,
-
                     user_id,
-
                     attendance_time,
-
                     status,
-
                     punch
-
                 )
 
                 DO NOTHING
-
-                """
-
-            )
-
-
-            # ------------------------------------------------
-            # Get insert count
-            # ------------------------------------------------
+            """)
 
             inserted = cur.rowcount
 
-
         conn.commit()
 
-
     duplicates = total - inserted
-
 
     return inserted, duplicates
 
 
 # ============================================================
-# GET ATTENDANCE COUNT
+# UPDATE ATTENDANCE EMPLOYEE NAMES
 # ============================================================
 
-def get_attendance_count():
+def update_attendance_names(
+    device_id,
+    user_map
+):
 
-    query = f"""
+    if not user_map:
 
-        SELECT COUNT(*)
+        return 0
 
-        FROM {ATTENDANCE_TABLE}
-
-    """
+    updated = 0
 
     with get_connection() as conn:
 
         with conn.cursor() as cur:
 
-            cur.execute(query)
+            for user_id, user_name in user_map.items():
+
+                if not user_id:
+
+                    continue
+
+                if not user_name:
+
+                    continue
+
+                cur.execute(
+                    f"""
+                    UPDATE {ATTENDANCE_TABLE}
+
+                    SET
+                        user_name = %s
+
+                    WHERE
+
+                        device_id = %s
+
+                        AND user_id = %s
+
+                        AND (
+                            user_name IS NULL
+                            OR user_name = ''
+                        )
+                    """,
+                    (
+                        user_name,
+                        device_id,
+                        str(user_id)
+                    )
+                )
+
+                updated += cur.rowcount
+
+        conn.commit()
+
+    return updated
+
+
+# ============================================================
+# TOTAL RECORDS
+# ============================================================
+
+def get_total_records():
+
+    with get_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            cur.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM {ATTENDANCE_TABLE}
+                """
+            )
 
             return cur.fetchone()[0]
+
+
+# ============================================================
+# LATEST RECORD
+# ============================================================
+
+def get_latest_record(
+    device_id
+):
+
+    with get_dict_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            cur.execute(
+                f"""
+                SELECT *
+
+                FROM {ATTENDANCE_TABLE}
+
+                WHERE device_id = %s
+
+                ORDER BY
+                    attendance_time DESC,
+                    id DESC
+
+                LIMIT 1
+                """,
+                (device_id,)
+            )
+
+            return cur.fetchone()
