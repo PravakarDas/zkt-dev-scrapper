@@ -1,550 +1,685 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
+{% block title %}
+Attendance - ZKTeco
+{% endblock %}
 
-    <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+{% block content %}
 
-    <title>ZKTeco Attendance</title>
+<style>
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        gap: 15px;
+    }
 
-    <style>
+    .page-header h2 {
+        margin: 0;
+        font-size: 24px;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f5f6f8;
-            font-family: Arial, sans-serif;
-            color: #222;
-        }
+    .page-header p {
+        margin: 5px 0 0;
+        color: #666;
+    }
 
-        .container {
-            width: 95%;
-            max-width: 1700px;
-            margin: 30px auto;
-        }
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
+    .filter-box {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
 
-        .header h1 {
-            margin: 0;
-            font-size: 28px;
-        }
+    .filter-box h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+    }
 
-        .header p {
-            margin: 7px 0 0;
-            color: #666;
-        }
 
-        .button {
-            display: inline-block;
-            background: #222;
-            color: white;
-            padding: 10px 16px;
-            border-radius: 6px;
-            text-decoration: none;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-        }
+    .filter-grid {
+        display: grid;
+        grid-template-columns:
+            repeat(auto-fit, minmax(180px, 1fr));
 
-        .button:hover {
-            background: #444;
-        }
+        gap: 12px;
+    }
 
-        .button.green {
-            background: #198754;
-        }
 
-        .button.gray {
-            background: #666;
-        }
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
 
-        .filter-box {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    .filter-group label {
+        font-size: 13px;
+        font-weight: bold;
+        color: #444;
+    }
+
+
+    .filter-group input,
+    .filter-group select {
+
+        width: 100%;
+        box-sizing: border-box;
+
+        padding: 9px 10px;
+
+        border: 1px solid #ccc;
+        border-radius: 5px;
+
+        background: white;
+
+        font-size: 14px;
+    }
+
+
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+
+    .button {
+
+        display: inline-block;
+
+        background: #222;
+        color: white;
+
+        padding: 10px 16px;
+
+        border-radius: 6px;
+
+        text-decoration: none;
+
+        border: none;
+
+        cursor: pointer;
+
+        font-size: 14px;
+    }
+
+    .button:hover {
+        background: #444;
+    }
+
+
+    .button.green {
+        background: #198754;
+    }
+
+    .button.green:hover {
+        background: #146c43;
+    }
+
+
+    .button.gray {
+        background: #666;
+    }
+
+    .button.gray:hover {
+        background: #555;
+    }
+
+
+    .summary-box {
+
+        background: white;
+
+        padding: 15px 20px;
+
+        border-radius: 8px;
+
+        margin-bottom: 20px;
+
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+
+    .summary-box strong {
+        font-size: 18px;
+    }
+
+
+    .table-wrapper {
+
+        background: white;
+
+        border-radius: 8px;
+
+        overflow-x: auto;
+
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+
+    table {
+
+        width: 100%;
+
+        border-collapse: collapse;
+
+        min-width: 1250px;
+    }
+
+
+    th,
+    td {
+
+        padding: 11px 10px;
+
+        border-bottom: 1px solid #eee;
+
+        text-align: left;
+
+        font-size: 13px;
+
+        white-space: nowrap;
+    }
+
+
+    th {
+
+        background: #f4f5f7;
+
+        font-weight: bold;
+
+        position: sticky;
+
+        top: 0;
+
+        z-index: 1;
+    }
+
+
+    tr:hover td {
+        background: #fafafa;
+    }
+
+
+    .record-link {
+
+        color: #0d6efd;
+
+        text-decoration: none;
+
+        font-weight: bold;
+    }
+
+
+    .record-link:hover {
+        text-decoration: underline;
+    }
+
+
+    .status-badge {
+
+        display: inline-block;
+
+        padding: 4px 8px;
+
+        border-radius: 12px;
+
+        font-size: 12px;
+    }
+
+
+    .punch-badge {
+
+        display: inline-block;
+
+        padding: 4px 8px;
+
+        border-radius: 12px;
+
+        background: #f1f1f1;
+
+        font-size: 12px;
+    }
+
+
+    .pagination {
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: center;
+
+        gap: 6px;
+
+        margin-top: 20px;
+
+        flex-wrap: wrap;
+    }
+
+
+    .pagination a,
+    .pagination span {
+
+        padding: 8px 12px;
+
+        border: 1px solid #ddd;
+
+        border-radius: 5px;
+
+        text-decoration: none;
+
+        color: #333;
+
+        background: white;
+
+        font-size: 14px;
+    }
+
+
+    .pagination a:hover {
+        background: #f0f0f0;
+    }
+
+
+    .pagination .current {
+
+        background: #222;
+
+        color: white;
+
+        border-color: #222;
+    }
+
+
+    .empty-state {
+
+        padding: 40px;
+
+        text-align: center;
+
+        color: #666;
+    }
+
+
+    @media (max-width: 700px) {
+
+        .page-header {
+
+            flex-direction: column;
+
+            align-items: flex-start;
         }
 
         .filter-grid {
-            display: grid;
-            grid-template-columns:
-                repeat(auto-fit, minmax(180px, 1fr));
 
-            gap: 15px;
+            grid-template-columns: 1fr;
         }
 
-        .field {
-            display: flex;
-            flex-direction: column;
-        }
+    }
 
-        .field label {
-            font-size: 13px;
-            font-weight: bold;
-            margin-bottom: 6px;
-        }
-
-        .field input,
-        .field select {
-            height: 38px;
-            padding: 0 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background: white;
-            box-sizing: border-box;
-        }
-
-        .actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-top: 18px;
-        }
-
-        .summary {
-            background: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-        }
-
-        .summary strong {
-            font-size: 18px;
-        }
-
-        .table-box {
-            background: white;
-            border-radius: 8px;
-            overflow-x: auto;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1500px;
-        }
-
-        th {
-            background: #eeeeee;
-            text-align: left;
-            padding: 11px 10px;
-            font-size: 13px;
-            white-space: nowrap;
-        }
-
-        td {
-            padding: 10px;
-            border-top: 1px solid #eeeeee;
-            font-size: 13px;
-            white-space: nowrap;
-        }
-
-        tr:hover td {
-            background: #fafafa;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            background: #eee;
-        }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            padding: 20px;
-            background: white;
-            margin-top: 15px;
-            border-radius: 8px;
-        }
-
-        .pagination a {
-            text-decoration: none;
-            background: #222;
-            color: white;
-            padding: 8px 14px;
-            border-radius: 5px;
-        }
-
-        .pagination a:hover {
-            background: #444;
-        }
-
-        .pagination span {
-            font-size: 14px;
-            font-weight: bold;
-        }
-
-        .empty {
-            padding: 40px;
-            text-align: center;
-            color: #777;
-        }
-
-        .record-link {
-            color: #222;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        .record-link:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 700px) {
-
-            .container {
-                width: 94%;
-            }
-
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-            .actions {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .actions .button {
-                text-align: center;
-            }
-
-        }
-
-    </style>
-
-</head>
+</style>
 
 
-<body>
+<!-- ====================================================== -->
+<!-- PAGE HEADER -->
+<!-- ====================================================== -->
 
-<div class="container">
+<div class="page-header">
+
+    <div>
+
+        <h2>
+            Attendance Records
+        </h2>
+
+        <p>
+            Search, filter and view ZKTeco attendance data.
+        </p>
+
+    </div>
+
+</div>
 
 
-    <!-- ======================================================
-         HEADER
-         ====================================================== -->
+<!-- ====================================================== -->
+<!-- FILTERS -->
+<!-- ====================================================== -->
 
-    <div class="header">
+<div class="filter-box">
 
-        <div>
+    <h3>
+        Search & Filters
+    </h3>
 
-            <h1>
-                ZKTeco Attendance
-            </h1>
 
-            <p>
-                Attendance database dashboard
-            </p>
+    <form
+        method="GET"
+        action="{{ url_for('index') }}"
+    >
+
+        <div class="filter-grid">
+
+
+            <!-- ID -->
+
+            <div class="filter-group">
+
+                <label for="record_id">
+                    Record ID
+                </label>
+
+                <input
+                    type="text"
+                    id="record_id"
+                    name="record_id"
+                    value="{{ filters.get('record_id', '') }}"
+                    placeholder="Record ID"
+                >
+
+            </div>
+
+
+            <!-- Employee ID -->
+
+            <div class="filter-group">
+
+                <label for="employee_id">
+                    Employee ID
+                </label>
+
+                <input
+                    type="text"
+                    id="employee_id"
+                    name="employee_id"
+                    value="{{ filters.get('employee_id', '') }}"
+                    placeholder="Employee ID"
+                >
+
+            </div>
+
+
+            <!-- Branch -->
+
+            <div class="filter-group">
+
+                <label for="branch">
+                    Branch
+                </label>
+
+                <select
+                    id="branch"
+                    name="branch"
+                >
+
+                    <option value="">
+                        All Branches
+                    </option>
+
+                    {% for branch in options.branches %}
+
+                        <option
+                            value="{{ branch }}"
+                            {% if filters.get('branch') == branch %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ branch }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Device IP -->
+
+            <div class="filter-group">
+
+                <label for="device_ip">
+                    Device IP
+                </label>
+
+                <select
+                    id="device_ip"
+                    name="device_ip"
+                >
+
+                    <option value="">
+                        All Devices
+                    </option>
+
+                    {% for ip in options.device_ips %}
+
+                        <option
+                            value="{{ ip }}"
+                            {% if filters.get('device_ip') == ip %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ ip }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Serial -->
+
+            <div class="filter-group">
+
+                <label for="device_serial">
+                    Device Serial
+                </label>
+
+                <select
+                    id="device_serial"
+                    name="device_serial"
+                >
+
+                    <option value="">
+                        All Serials
+                    </option>
+
+                    {% for serial in options.device_serials %}
+
+                        <option
+                            value="{{ serial }}"
+                            {% if filters.get('device_serial') == serial %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ serial }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Punch Type -->
+
+            <div class="filter-group">
+
+                <label for="punch_type">
+                    Punch Type
+                </label>
+
+                <select
+                    id="punch_type"
+                    name="punch_type"
+                >
+
+                    <option value="">
+                        All Types
+                    </option>
+
+                    {% for punch_type in options.punch_types %}
+
+                        <option
+                            value="{{ punch_type }}"
+                            {% if filters.get('punch_type') == punch_type %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ punch_type }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Status -->
+
+            <div class="filter-group">
+
+                <label for="status">
+                    Status
+                </label>
+
+                <select
+                    id="status"
+                    name="status"
+                >
+
+                    <option value="">
+                        All Status
+                    </option>
+
+                    <option
+                        value="0"
+                        {% if filters.get('status') == '0' %}
+                            selected
+                        {% endif %}
+                    >
+                        0
+                    </option>
+
+                    <option
+                        value="1"
+                        {% if filters.get('status') == '1' %}
+                            selected
+                        {% endif %}
+                    >
+                        1
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- From Date -->
+
+            <div class="filter-group">
+
+                <label for="from_date">
+                    From Date
+                </label>
+
+                <input
+                    type="date"
+                    id="from_date"
+                    name="from_date"
+                    value="{{ filters.get('from_date', '') }}"
+                >
+
+            </div>
+
+
+            <!-- To Date -->
+
+            <div class="filter-group">
+
+                <label for="to_date">
+                    To Date
+                </label>
+
+                <input
+                    type="date"
+                    id="to_date"
+                    name="to_date"
+                    value="{{ filters.get('to_date', '') }}"
+                >
+
+            </div>
 
         </div>
 
-        <div>
+
+        <div class="filter-actions">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Apply Filters
+            </button>
+
 
             <a
                 href="{{ url_for('index') }}"
-                class="button"
+                class="button gray"
             >
-                Attendance
+                Clear
             </a>
+
+
+            <button
+                type="submit"
+                formaction="{{ url_for('download_csv') }}"
+                class="button green"
+            >
+                Export CSV
+            </button>
 
         </div>
 
-    </div>
+    </form>
 
+</div>
 
 
-    <!-- ======================================================
-         FILTERS
-         ====================================================== -->
+<!-- ====================================================== -->
+<!-- SUMMARY -->
+<!-- ====================================================== -->
 
-    <div class="filter-box">
+<div class="summary-box">
 
-        <form
-            method="GET"
-            action="{{ url_for('index') }}"
-        >
+    Showing
 
-            <div class="filter-grid">
+    <strong>
+        {{ total_records|default(0) }}
+    </strong>
 
+    matching attendance record(s).
 
-                <!-- Employee ID -->
+</div>
 
-                <div class="field">
 
-                    <label>
-                        Employee ID
-                    </label>
+<!-- ====================================================== -->
+<!-- TABLE -->
+<!-- ====================================================== -->
 
-                    <input
-                        type="text"
-                        name="employee_id"
-                        value="{{ filters.get('employee_id', '') }}"
-                        placeholder="Employee ID"
-                    >
+<div class="table-wrapper">
 
-                </div>
-
-
-
-                <!-- From Date -->
-
-                <div class="field">
-
-                    <label>
-                        From Date
-                    </label>
-
-                    <input
-                        type="date"
-                        name="from_date"
-                        value="{{ filters.get('from_date', '') }}"
-                    >
-
-                </div>
-
-
-
-                <!-- To Date -->
-
-                <div class="field">
-
-                    <label>
-                        To Date
-                    </label>
-
-                    <input
-                        type="date"
-                        name="to_date"
-                        value="{{ filters.get('to_date', '') }}"
-                    >
-
-                </div>
-
-
-
-                <!-- Branch -->
-
-                <div class="field">
-
-                    <label>
-                        Branch
-                    </label>
-
-                    <select name="branch">
-
-                        <option value="">
-                            All Branches
-                        </option>
-
-                        {% for branch in options.get('branches', []) %}
-
-                            <option
-                                value="{{ branch }}"
-                                {% if filters.get('branch', '') == branch %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ branch }}
-                            </option>
-
-                        {% endfor %}
-
-                    </select>
-
-                </div>
-
-
-
-                <!-- Device -->
-
-                <div class="field">
-
-                    <label>
-                        Device
-                    </label>
-
-                    <select name="device_ip">
-
-                        <option value="">
-                            All Devices
-                        </option>
-
-                        {% for device in options.get('devices', []) %}
-
-                            <option
-                                value="{{ device }}"
-                                {% if filters.get('device_ip', '') == device %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ device }}
-                            </option>
-
-                        {% endfor %}
-
-                    </select>
-
-                </div>
-
-
-
-                <!-- Punch Type -->
-
-                <div class="field">
-
-                    <label>
-                        Punch Type
-                    </label>
-
-                    <select name="punch_type">
-
-                        <option value="">
-                            All Punch Types
-                        </option>
-
-                        {% for punch in options.get('punch_types', []) %}
-
-                            <option
-                                value="{{ punch }}"
-                                {% if filters.get('punch_type', '') == punch|string %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ punch }}
-                            </option>
-
-                        {% endfor %}
-
-                    </select>
-
-                </div>
-
-
-
-                <!-- Status -->
-
-                <div class="field">
-
-                    <label>
-                        Status
-                    </label>
-
-                    <select name="status">
-
-                        <option value="">
-                            All Status
-                        </option>
-
-                        {% for status in options.get('statuses', []) %}
-
-                            <option
-                                value="{{ status }}"
-                                {% if filters.get('status', '') == status|string %}
-                                    selected
-                                {% endif %}
-                            >
-                                {{ status }}
-                            </option>
-
-                        {% endfor %}
-
-                    </select>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- ACTIONS -->
-
-            <div class="actions">
-
-                <button
-                    type="submit"
-                    class="button"
-                >
-                    Search
-                </button>
-
-
-                <a
-                    href="{{ url_for('index') }}"
-                    class="button gray"
-                >
-                    Clear
-                </a>
-
-
-                <button
-                    type="submit"
-                    formaction="{{ url_for('download_csv') }}"
-                    class="button green"
-                >
-                    Download CSV
-                </button>
-
-            </div>
-
-        </form>
-
-    </div>
-
-
-
-    <!-- ======================================================
-         SUMMARY
-         ====================================================== -->
-
-    <div class="summary">
-
-        Showing
-
-        <strong>
-            {{ total_records }}
-        </strong>
-
-        records.
-
-    </div>
-
-
-
-    <!-- ======================================================
-         DATA TABLE
-         ====================================================== -->
-
-    <div class="table-box">
-
-        {% if records %}
+    {% if records %}
 
         <table>
 
@@ -552,37 +687,53 @@
 
                 <tr>
 
-                    <th>ID</th>
+                    <th>
+                        ID
+                    </th>
 
-                    <th>Branch</th>
+                    <th>
+                        Branch
+                    </th>
 
-                    <th>Employee ID</th>
+                    <th>
+                        Device
+                    </th>
 
-                    <th>Employee Name</th>
+                    <th>
+                        Serial
+                    </th>
 
-                    <th>Attendance Time</th>
+                    <th>
+                        Employee ID
+                    </th>
 
-                    <th>Status</th>
+                    <th>
+                        Employee Name
+                    </th>
 
-                    <th>Punch</th>
+                    <th>
+                        Attendance Time
+                    </th>
 
-                    <th>Punch Type</th>
+                    <th>
+                        Status
+                    </th>
 
-                    <th>Device ID</th>
+                    <th>
+                        Punch
+                    </th>
 
-                    <th>Device IP</th>
+                    <th>
+                        Punch Type
+                    </th>
 
-                    <th>Device Port</th>
+                    <th>
+                        Created At
+                    </th>
 
-                    <th>Device Name</th>
-
-                    <th>Serial Number</th>
-
-                    <th>Firmware</th>
-
-                    <th>Platform</th>
-
-                    <th>Created At</th>
+                    <th>
+                        Details
+                    </th>
 
                 </tr>
 
@@ -591,281 +742,182 @@
 
             <tbody>
 
-            {% for record in records %}
+                {% for record in records %}
 
-                <tr>
+                    <tr>
 
+                        <td>
 
-                    <!-- DATABASE ID -->
+                            <a
+                                class="record-link"
+                                href="{{ url_for('record_details', record_id=record.id) }}"
+                            >
+                                {{ record.id }}
+                            </a>
 
-                    <td>
+                        </td>
 
-                        <a
-                            class="record-link"
-                            href="{{ url_for(
-                                'record_details',
-                                record_id=record['id']
-                            ) }}"
-                        >
-                            {{ record.get('id', '') }}
-                        </a>
 
-                    </td>
+                        <td>
+                            {{ record.branch_name or '-' }}
+                        </td>
 
 
+                        <td>
 
-                    <!-- BRANCH -->
+                            {{ record.device_ip or '-' }}
 
-                    <td>
+                            {% if record.device_port %}
+                                :{{ record.device_port }}
+                            {% endif %}
 
-                        {{ record.get('branch_name', '') }}
+                        </td>
 
-                    </td>
 
+                        <td>
+                            {{ record.serial_number or '-' }}
+                        </td>
 
 
-                    <!-- EMPLOYEE ID -->
+                        <td>
+                            {{ record.user_id or '-' }}
+                        </td>
 
-                    <td>
 
-                        {{ record.get('user_id', '') }}
+                        <td>
+                            {{ record.user_name or '-' }}
+                        </td>
 
-                    </td>
 
+                        <td>
+                            {{ record.attendance_time or '-' }}
+                        </td>
 
 
-                    <!-- EMPLOYEE NAME -->
+                        <td>
 
-                    <td>
+                            <span class="status-badge">
+                                {{ record.status if record.status is not none else '-' }}
+                            </span>
 
-                        {{ record.get('user_name', '') }}
+                        </td>
 
-                    </td>
 
+                        <td>
 
+                            <span class="punch-badge">
+                                {{ record.punch if record.punch is not none else '-' }}
+                            </span>
 
-                    <!-- ATTENDANCE TIME -->
+                        </td>
 
-                    <td>
 
-                        {{ record.get('attendance_time', '') }}
+                        <td>
+                            {{ record.punch_type or '-' }}
+                        </td>
 
-                    </td>
 
+                        <td>
+                            {{ record.created_at or '-' }}
+                        </td>
 
 
-                    <!-- STATUS -->
+                        <td>
 
-                    <td>
+                            <a
+                                class="record-link"
+                                href="{{ url_for('record_details', record_id=record.id) }}"
+                            >
+                                View
+                            </a>
 
-                        <span class="badge">
+                        </td>
 
-                            {{ record.get('status', '') }}
+                    </tr>
 
-                        </span>
-
-                    </td>
-
-
-
-                    <!-- PUNCH -->
-
-                    <td>
-
-                        {{ record.get('punch', '') }}
-
-                    </td>
-
-
-
-                    <!-- PUNCH TYPE -->
-
-                    <td>
-
-                        {{ record.get('punch_type', '') }}
-
-                    </td>
-
-
-
-                    <!-- DEVICE ID -->
-
-                    <td>
-
-                        {{ record.get('device_id', '') }}
-
-                    </td>
-
-
-
-                    <!-- DEVICE IP -->
-
-                    <td>
-
-                        {{ record.get('device_ip', '') }}
-
-                    </td>
-
-
-
-                    <!-- DEVICE PORT -->
-
-                    <td>
-
-                        {{ record.get('device_port', '') }}
-
-                    </td>
-
-
-
-                    <!-- DEVICE NAME -->
-
-                    <td>
-
-                        {{ record.get('device_name', '') }}
-
-                    </td>
-
-
-
-                    <!-- SERIAL -->
-
-                    <td>
-
-                        {{ record.get('serial_number', '') }}
-
-                    </td>
-
-
-
-                    <!-- FIRMWARE -->
-
-                    <td>
-
-                        {{ record.get('firmware', '') }}
-
-                    </td>
-
-
-
-                    <!-- PLATFORM -->
-
-                    <td>
-
-                        {{ record.get('platform', '') }}
-
-                    </td>
-
-
-
-                    <!-- CREATED AT -->
-
-                    <td>
-
-                        {{ record.get('created_at', '') }}
-
-                    </td>
-
-
-                </tr>
-
-            {% endfor %}
+                {% endfor %}
 
             </tbody>
 
         </table>
 
+    {% else %}
 
-        {% else %}
-
-        <div class="empty">
+        <div class="empty-state">
 
             <h3>
-                No attendance records found
+                No records found
             </h3>
 
             <p>
-                Try changing the employee ID, date or device filters.
+                Try changing your filters.
             </p>
 
         </div>
 
-        {% endif %}
+    {% endif %}
 
-    </div>
+</div>
 
 
+<!-- ====================================================== -->
+<!-- PAGINATION -->
+<!-- ====================================================== -->
 
-    <!-- ======================================================
-         PAGINATION
-         ====================================================== -->
-
-    {% if total_pages > 1 %}
+{% if total_pages and total_pages > 1 %}
 
     <div class="pagination">
 
 
         {% if page > 1 %}
 
-        <a
-            href="{{ url_for(
-                'index',
-                page=page-1,
-                employee_id=filters.get('employee_id', ''),
-                branch=filters.get('branch', ''),
-                device_ip=filters.get('device_ip', ''),
-                from_date=filters.get('from_date', ''),
-                to_date=filters.get('to_date', ''),
-                punch_type=filters.get('punch_type', ''),
-                status=filters.get('status', '')
-            ) }}"
-        >
-            ← Previous
-        </a>
+            <a
+                href="{{ pagination_url(page - 1) }}"
+            >
+                Previous
+            </a>
 
         {% endif %}
 
 
+        {% set start_page = [1, page - 2]|max %}
 
-        <span>
+        {% set end_page = [total_pages, page + 2]|min %}
 
-            Page
-            {{ page }}
-            of
-            {{ total_pages }}
 
-        </span>
+        {% for p in range(start_page, end_page + 1) %}
 
+            {% if p == page %}
+
+                <span class="current">
+                    {{ p }}
+                </span>
+
+            {% else %}
+
+                <a
+                    href="{{ pagination_url(p) }}"
+                >
+                    {{ p }}
+                </a>
+
+            {% endif %}
+
+        {% endfor %}
 
 
         {% if page < total_pages %}
 
-        <a
-            href="{{ url_for(
-                'index',
-                page=page+1,
-                employee_id=filters.get('employee_id', ''),
-                branch=filters.get('branch', ''),
-                device_ip=filters.get('device_ip', ''),
-                from_date=filters.get('from_date', ''),
-                to_date=filters.get('to_date', ''),
-                punch_type=filters.get('punch_type', ''),
-                status=filters.get('status', '')
-            ) }}"
-        >
-            Next →
-        </a>
+            <a
+                href="{{ pagination_url(page + 1) }}"
+            >
+                Next
+            </a>
 
         {% endif %}
 
-
     </div>
 
-    {% endif %}
+{% endif %}
 
-
-</div>
-
-</body>
-
-</html>
+{% endblock %}

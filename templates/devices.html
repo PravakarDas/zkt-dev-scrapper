@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+
+    <div>
+        <h1>ZKTeco Devices</h1>
+
+        <p>
+            Manage all connected attendance devices.
+        </p>
+    </div>
+
+    <a
+        href="{{ url_for('add_device_page') }}"
+        class="btn btn-primary"
+    >
+        + Add Device
+    </a>
+
+</div>
+
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+
+    {% if messages %}
+
+        {% for category, message in messages %}
+
+            <div class="alert {{ category }}">
+                {{ message }}
+            </div>
+
+        {% endfor %}
+
+    {% endif %}
+
+{% endwith %}
+
+
+<div class="card">
+
+    <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+
+                <tr>
+
+                    <th>ID</th>
+                    <th>Branch</th>
+                    <th>IP Address</th>
+                    <th>Port</th>
+                    <th>Device</th>
+                    <th>Serial</th>
+                    <th>Firmware</th>
+                    <th>Platform</th>
+                    <th>Status</th>
+                    <th>Last Seen</th>
+                    <th>Action</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for device in devices %}
+
+                <tr>
+
+                    <td>
+                        {{ device.id }}
+                    </td>
+
+                    <td>
+                        <strong>
+                            {{ device.branch_name }}
+                        </strong>
+                    </td>
+
+                    <td>
+                        {{ device.ip_address }}
+                    </td>
+
+                    <td>
+                        {{ device.port }}
+                    </td>
+
+                    <td>
+                        {{ device.device_name or "-" }}
+                    </td>
+
+                    <td>
+                        {{ device.serial_number or "-" }}
+                    </td>
+
+                    <td>
+                        {{ device.firmware or "-" }}
+                    </td>
+
+                    <td>
+                        {{ device.platform or "-" }}
+                    </td>
+
+                    <td>
+
+                        {% if device.status == "active" %}
+
+                            <span class="status active">
+                                Active
+                            </span>
+
+                        {% else %}
+
+                            <span class="status inactive">
+                                Inactive
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {% if device.last_seen %}
+
+                            {{ device.last_seen.strftime("%Y-%m-%d %H:%M:%S") }}
+
+                        {% else %}
+
+                            -
+
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {% if device.status == "active" %}
+
+                        <form
+                            method="POST"
+                            action="{{ url_for(
+                                'remove_device',
+                                device_id=device.device_id
+                            ) }}"
+                            onsubmit="return confirm(
+                                'Remove this device from collection?'
+                            );"
+                        >
+
+                            <button
+                                type="submit"
+                                class="btn btn-danger"
+                            >
+                                Remove
+                            </button>
+
+                        </form>
+
+                        {% else %}
+
+                        <form
+                            method="POST"
+                            action="{{ url_for(
+                                'activate_device_page',
+                                device_id=device.device_id
+                            ) }}"
+                        >
+
+                            <button
+                                type="submit"
+                                class="btn btn-success"
+                            >
+                                Activate
+                            </button>
+
+                        </form>
+
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+
+                    <td
+                        colspan="11"
+                        style="text-align:center;"
+                    >
+                        No devices added yet.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

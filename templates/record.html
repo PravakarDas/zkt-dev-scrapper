@@ -1,171 +1,371 @@
 {% extends "base.html" %}
 
+{% block title %}
+Record #{{ record.id }} - ZKTeco
+{% endblock %}
+
 
 {% block content %}
 
-<div class="card">
+<style>
 
-    <div class="details-header">
+    .record-header {
 
-        <div>
+        display: flex;
 
-            <h2>
-                Attendance Record #{{ record.id }}
-            </h2>
+        justify-content: space-between;
 
-            <p>
-                Complete record information
-            </p>
+        align-items: center;
 
-        </div>
+        margin-bottom: 20px;
 
-        <a
-            href="{{ url_for('index') }}"
-            class="button secondary"
-        >
-            ← Back
-        </a>
+        gap: 15px;
+    }
+
+
+    .record-header h2 {
+
+        margin: 0;
+
+        font-size: 24px;
+    }
+
+
+    .record-card {
+
+        background: white;
+
+        border-radius: 8px;
+
+        padding: 25px;
+
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+
+    .record-grid {
+
+        display: grid;
+
+        grid-template-columns:
+            repeat(auto-fit, minmax(260px, 1fr));
+
+        gap: 18px;
+    }
+
+
+    .record-item {
+
+        border-bottom: 1px solid #eee;
+
+        padding-bottom: 12px;
+    }
+
+
+    .record-label {
+
+        font-size: 12px;
+
+        color: #777;
+
+        margin-bottom: 5px;
+
+        font-weight: bold;
+
+        text-transform: uppercase;
+    }
+
+
+    .record-value {
+
+        font-size: 15px;
+
+        word-break: break-word;
+    }
+
+
+    .raw-data {
+
+        margin-top: 25px;
+
+        padding: 15px;
+
+        background: #f5f5f5;
+
+        border-radius: 6px;
+
+        overflow-x: auto;
+
+        white-space: pre-wrap;
+
+        word-break: break-word;
+
+        font-family: monospace;
+
+        font-size: 13px;
+    }
+
+
+    .button {
+
+        display: inline-block;
+
+        background: #222;
+
+        color: white;
+
+        padding: 10px 16px;
+
+        border-radius: 6px;
+
+        text-decoration: none;
+
+        font-size: 14px;
+    }
+
+
+    .button:hover {
+
+        background: #444;
+    }
+
+
+    @media (max-width: 700px) {
+
+        .record-header {
+
+            flex-direction: column;
+
+            align-items: flex-start;
+        }
+
+    }
+
+</style>
+
+
+<div class="record-header">
+
+    <div>
+
+        <h2>
+            Attendance Record #{{ record.id }}
+        </h2>
 
     </div>
 
 
-    <div class="details-grid">
+    <a
+        href="{{ url_for('index') }}"
+        class="button"
+    >
+        Back to Attendance
+    </a>
+
+</div>
 
 
-        <div class="detail-section">
+<div class="record-card">
 
-            <h3>
-                Attendance
-            </h3>
+    <div class="record-grid">
 
-            <div class="detail-row">
-                <span>Employee ID</span>
-                <strong>{{ record.user_id }}</strong>
+
+        <div class="record-item">
+
+            <div class="record-label">
+                ID
             </div>
 
-            <div class="detail-row">
-                <span>Employee Name</span>
-                <strong>
-                    {{ record.user_name or "-" }}
-                </strong>
-            </div>
-
-            <div class="detail-row">
-                <span>Attendance Time</span>
-                <strong>
-                    {{ record.attendance_time }}
-                </strong>
-            </div>
-
-            <div class="detail-row">
-                <span>Status</span>
-                <strong>
-                    {{ record.status }}
-                </strong>
-            </div>
-
-            <div class="detail-row">
-                <span>Punch</span>
-                <strong>
-                    {{ record.punch }}
-                </strong>
-            </div>
-
-            <div class="detail-row">
-                <span>Punch Type</span>
-                <strong>
-                    {{ record.punch_type }}
-                </strong>
+            <div class="record-value">
+                {{ record.id }}
             </div>
 
         </div>
 
 
-        <div class="detail-section">
+        <div class="record-item">
 
-            <h3>
+            <div class="record-label">
                 Branch
-            </h3>
+            </div>
 
-            <div class="detail-row">
-                <span>Branch Name</span>
-                <strong>
-                    {{ record.branch_name }}
-                </strong>
+            <div class="record-value">
+                {{ record.branch_name or '-' }}
             </div>
 
         </div>
 
 
-        <div class="detail-section">
+        <div class="record-item">
 
-            <h3>
-                Device
-            </h3>
-
-            <div class="detail-row">
-                <span>IP Address</span>
-                <strong>
-                    {{ record.device_ip }}
-                </strong>
+            <div class="record-label">
+                Device IP
             </div>
 
-            <div class="detail-row">
-                <span>Port</span>
-                <strong>
-                    {{ record.device_port }}
-                </strong>
-            </div>
+            <div class="record-value">
 
-            <div class="detail-row">
-                <span>Serial</span>
-                <strong>
-                    {{ record.device_serial }}
-                </strong>
-            </div>
+                {{ record.device_ip or '-' }}
 
-            <div class="detail-row">
-                <span>Device Name</span>
-                <strong>
-                    {{ record.device_name }}
-                </strong>
-            </div>
+                {% if record.device_port %}
+                    :{{ record.device_port }}
+                {% endif %}
 
-            <div class="detail-row">
-                <span>Platform</span>
-                <strong>
-                    {{ record.device_platform }}
-                </strong>
-            </div>
-
-            <div class="detail-row">
-                <span>Firmware</span>
-                <strong>
-                    {{ record.device_firmware }}
-                </strong>
             </div>
 
         </div>
 
 
-        <div class="detail-section">
+        <div class="record-item">
 
-            <h3>
-                Database
-            </h3>
-
-            <div class="detail-row">
-                <span>Database ID</span>
-                <strong>
-                    {{ record.id }}
-                </strong>
+            <div class="record-label">
+                Device Name
             </div>
 
-            <div class="detail-row">
-                <span>Created At</span>
-                <strong>
-                    {{ record.created_at }}
-                </strong>
+            <div class="record-value">
+                {{ record.device_name or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Serial Number
+            </div>
+
+            <div class="record-value">
+                {{ record.serial_number or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Firmware
+            </div>
+
+            <div class="record-value">
+                {{ record.firmware or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Platform
+            </div>
+
+            <div class="record-value">
+                {{ record.platform or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Employee ID
+            </div>
+
+            <div class="record-value">
+                {{ record.user_id or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Employee Name
+            </div>
+
+            <div class="record-value">
+                {{ record.user_name or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Attendance Time
+            </div>
+
+            <div class="record-value">
+                {{ record.attendance_time or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Status
+            </div>
+
+            <div class="record-value">
+                {{ record.status if record.status is not none else '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Punch
+            </div>
+
+            <div class="record-value">
+                {{ record.punch if record.punch is not none else '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Punch Type
+            </div>
+
+            <div class="record-value">
+                {{ record.punch_type or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Created At
+            </div>
+
+            <div class="record-value">
+                {{ record.created_at or '-' }}
+            </div>
+
+        </div>
+
+
+        <div class="record-item">
+
+            <div class="record-label">
+                Record Hash
+            </div>
+
+            <div class="record-value">
+                {{ record.record_hash or '-' }}
             </div>
 
         </div>
@@ -174,15 +374,17 @@
     </div>
 
 
-    <div class="raw-data">
+    {% if record.raw_data %}
 
-        <h3>
-            Raw Device Data
-        </h3>
+        <div class="record-label" style="margin-top:25px;">
+            Raw Data
+        </div>
 
-        <pre>{{ record.raw_data }}</pre>
+        <div class="raw-data">
+            {{ record.raw_data }}
+        </div>
 
-    </div>
+    {% endif %}
 
 </div>
 

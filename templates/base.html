@@ -11,7 +11,9 @@
     >
 
     <title>
+        {% block title %}
         ZKTeco Attendance
+        {% endblock %}
     </title>
 
     <link
@@ -25,9 +27,13 @@
 
 <div class="container">
 
+    <!-- ================================================== -->
+    <!-- HEADER -->
+    <!-- ================================================== -->
+
     <header class="header">
 
-        <div>
+        <div class="header-left">
 
             <h1>
                 ZKTeco Attendance
@@ -39,18 +45,81 @@
 
         </div>
 
-        <a
-            href="/"
-            class="home-button"
-        >
-            Attendance
-        </a>
+
+        <!-- ================================================== -->
+        <!-- NAVIGATION -->
+        <!-- ================================================== -->
+
+        <nav class="navigation">
+
+            <a
+                href="{{ url_for('index') }}"
+                class="nav-button {% if request.endpoint == 'index' %}active{% endif %}"
+            >
+                Attendance
+            </a>
+
+
+            <a
+                href="{{ url_for('devices') }}"
+                class="nav-button {% if request.endpoint and request.endpoint.startswith('devices') %}active{% endif %}"
+            >
+                Devices
+            </a>
+
+        </nav>
 
     </header>
 
 
-    {% block content %}
-    {% endblock %}
+    <!-- ================================================== -->
+    <!-- FLASH MESSAGES -->
+    <!-- ================================================== -->
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+
+        {% if messages %}
+
+            <div class="flash-container">
+
+                {% for category, message in messages %}
+
+                    <div class="flash-message {{ category }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    <!-- ================================================== -->
+    <!-- PAGE CONTENT -->
+    <!-- ================================================== -->
+
+    <main>
+
+        {% block content %}
+        {% endblock %}
+
+    </main>
+
+
+    <!-- ================================================== -->
+    <!-- FOOTER -->
+    <!-- ================================================== -->
+
+    <footer class="footer">
+
+        <p>
+            ZKTeco Attendance System
+        </p>
+
+    </footer>
 
 </div>
 
