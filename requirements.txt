@@ -1,4 +1,5 @@
 pyzk
 psycopg[binary]
+psycopg-pool
 python-dotenv
 flask
