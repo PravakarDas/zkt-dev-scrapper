@@ -3,149 +3,43 @@
 {% block content %}
 
 <div class="page-header">
-
     <div>
-
-        <h1>Add ZKTeco Device</h1>
-
-        <p>
-            Enter the device connection details.
-            The system will automatically test the device
-            and read its information.
-        </p>
-
+        <h1>Add Device</h1>
+        <p>Enter the device connection details. The system will test the device and read its info automatically.</p>
     </div>
-
 </div>
 
+<div class="card form-card card-pad">
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-
-    {% if messages %}
-
-        {% for category, message in messages %}
-
-            <div class="alert {{ category }}">
-                {{ message }}
-            </div>
-
-        {% endfor %}
-
-    {% endif %}
-
-{% endwith %}
-
-
-<div class="card form-card">
-
-    <form
-        method="POST"
-        action="{{ url_for('add_device_page') }}"
-    >
+    <form method="POST" action="{{ url_for('add_device_page') }}">
 
         <div class="form-group">
-
-            <label>
-                Branch Name
-            </label>
-
-            <input
-                type="text"
-                name="branch_name"
-                placeholder="Example: CTG Office"
-                required
-            >
-
+            <label>Branch Name</label>
+            <input type="text" name="branch_name" placeholder="Example: CTG Office" required>
         </div>
-
 
         <div class="form-group">
-
-            <label>
-                IP Address
-            </label>
-
-            <input
-                type="text"
-                name="ip_address"
-                placeholder="Example: 119.10.168.198"
-                required
-            >
-
+            <label>IP Address</label>
+            <input type="text" name="ip_address" placeholder="Example: 119.10.168.198" required>
         </div>
-
 
         <div class="form-group">
-
-            <label>
-                Port
-            </label>
-
-            <input
-                type="number"
-                name="port"
-                value="1111"
-                min="1"
-                max="65535"
-                required
-            >
-
+            <label>Port</label>
+            <input type="number" name="port" value="1111" min="1" max="65535" required>
         </div>
-
 
         <div class="form-info">
-
-            <strong>
-                What will happen?
-            </strong>
-
+            <strong>What will happen?</strong>
             <ul>
-
-                <li>
-                    System will connect to the device.
-                </li>
-
-                <li>
-                    Device serial will be detected automatically.
-                </li>
-
-                <li>
-                    Firmware will be detected automatically.
-                </li>
-
-                <li>
-                    Device model will be detected automatically.
-                </li>
-
-                <li>
-                    Platform will be detected automatically.
-                </li>
-
-                <li>
-                    The device will then be added to the collector.
-                </li>
-
+                <li>System will connect to the device.</li>
+                <li>Device serial, firmware, model and platform will be detected automatically.</li>
+                <li>The device will then be added to the collector and start syncing.</li>
             </ul>
-
         </div>
 
-
         <div class="form-actions">
-
-            <a
-                href="{{ url_for('devices') }}"
-                class="btn btn-secondary"
-            >
-                Cancel
-            </a>
-
-            <button
-                type="submit"
-                class="btn btn-primary"
-            >
-                Connect & Add Device
-            </button>
-
+            <a href="{{ url_for('devices') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Connect &amp; Add Device</button>
         </div>
 
     </form>

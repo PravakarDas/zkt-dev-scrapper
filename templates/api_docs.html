@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}API Docs - ZKTeco{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>API Documentation</h1>
+        <p>Every endpoint under <code>/api/v1</code> requires the <code>X-API-Key</code> header.</p>
+    </div>
+</div>
+
+<div class="card card-pad" style="margin-bottom:16px;">
+
+    <strong>Using this from Postman</strong>
+
+    <ol style="color:var(--text-muted); font-size:13.5px; line-height:1.9;">
+        <li>In Postman: <strong>File &rarr; Import &rarr; Link</strong>, paste
+            <code>{{ request.url_root }}api/v1/openapi.json</code> &mdash; this creates a
+            ready-made collection with every endpoint and parameter below.</li>
+        <li>On the collection (or an individual request), add a header
+            <code>X-API-Key</code> with the value below.</li>
+    </ol>
+
+    <div class="key-hint">
+        X-API-Key: <code id="key-value">{{ api_key or "NOT SET - add API_KEY to .env" }}</code>
+        <button class="btn btn-secondary btn-sm" id="copy-key" type="button">Copy</button>
+    </div>
+
+</div>
+
+<div class="card">
+    <div id="swagger-ui" style="padding:8px;"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.min.js"></script>
+
+<script>
+
+    document.getElementById("copy-key").addEventListener("click", () => {
+
+        const value = document.getElementById("key-value").textContent;
+
+        navigator.clipboard.writeText(value).then(() => {
+
+            const btn = document.getElementById("copy-key");
+            const original = btn.textContent;
+            btn.textContent = "Copied!";
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        });
+    });
+
+    window.addEventListener("load", () => {
+
+        window.ui = SwaggerUIBundle({
+            url: "/api/v1/openapi.json",
+            dom_id: "#swagger-ui",
+            presets: [SwaggerUIBundle.presets.apis],
+            layout: "BaseLayout",
+            docExpansion: "list",
+            defaultModelsExpandDepth: -1,
+        });
+    });
+
+</script>
+
+{% endblock %}

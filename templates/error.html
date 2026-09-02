@@ -1,27 +1,12 @@
 {% extends "base.html" %}
 
-
 {% block content %}
 
-<div class="card error-box">
-
-    <h2>
-        Error
-    </h2>
-
-    <p>
-        Something went wrong while reading the database.
-    </p>
-
-    <pre>{{ error }}</pre>
-
-    <a
-        href="/"
-        class="button primary"
-    >
-        Go Back
-    </a>
-
+<div class="card card-pad">
+    <h2 style="margin-top:0;">Something went wrong</h2>
+    <p class="cell-muted">The server ran into an error handling this page.</p>
+    <pre style="white-space:pre-wrap; background:var(--surface-2); padding:14px; border-radius:8px; font-size:12.5px;">{{ error }}</pre>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">Go back</a>
 </div>
 
 {% endblock %}

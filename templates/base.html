@@ -1,128 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="api-key" content="{{ api_key }}">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <title>{% block title %}ZKTeco Attendance{% endblock %}</title>
 
-    <title>
-        {% block title %}
-        ZKTeco Attendance
-        {% endblock %}
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
 </head>
-
 <body>
 
-<div class="container">
+<div class="topbar">
 
-    <!-- ================================================== -->
-    <!-- HEADER -->
-    <!-- ================================================== -->
+    <a href="{{ url_for('index') }}" class="brand">
+        <span class="dot"></span>
+        ZKTeco Attendance
+    </a>
 
-    <header class="header">
+    <nav class="topnav">
 
-        <div class="header-left">
+        <a
+            href="{{ url_for('index') }}"
+            class="{% if request.endpoint == 'index' %}active{% endif %}"
+        >Attendance</a>
 
-            <h1>
-                ZKTeco Attendance
-            </h1>
+        <a
+            href="{{ url_for('devices') }}"
+            class="{% if request.endpoint and request.endpoint.startswith('devices') or request.endpoint == 'add_device_page' %}active{% endif %}"
+        >Devices</a>
 
-            <p>
-                Attendance database dashboard
-            </p>
+        <a
+            href="{{ url_for('api_docs') }}"
+            class="{% if request.endpoint == 'api_docs' %}active{% endif %}"
+        >API Docs</a>
 
-        </div>
-
-
-        <!-- ================================================== -->
-        <!-- NAVIGATION -->
-        <!-- ================================================== -->
-
-        <nav class="navigation">
-
-            <a
-                href="{{ url_for('index') }}"
-                class="nav-button {% if request.endpoint == 'index' %}active{% endif %}"
-            >
-                Attendance
-            </a>
-
-
-            <a
-                href="{{ url_for('devices') }}"
-                class="nav-button {% if request.endpoint and request.endpoint.startswith('devices') %}active{% endif %}"
-            >
-                Devices
-            </a>
-
-        </nav>
-
-    </header>
-
-
-    <!-- ================================================== -->
-    <!-- FLASH MESSAGES -->
-    <!-- ================================================== -->
-
-    {% with messages = get_flashed_messages(with_categories=true) %}
-
-        {% if messages %}
-
-            <div class="flash-container">
-
-                {% for category, message in messages %}
-
-                    <div class="flash-message {{ category }}">
-                        {{ message }}
-                    </div>
-
-                {% endfor %}
-
-            </div>
-
-        {% endif %}
-
-    {% endwith %}
-
-
-    <!-- ================================================== -->
-    <!-- PAGE CONTENT -->
-    <!-- ================================================== -->
-
-    <main>
-
-        {% block content %}
-        {% endblock %}
-
-    </main>
-
-
-    <!-- ================================================== -->
-    <!-- FOOTER -->
-    <!-- ================================================== -->
-
-    <footer class="footer">
-
-        <p>
-            ZKTeco Attendance System
-        </p>
-
-    </footer>
+    </nav>
 
 </div>
 
-</body>
+<div class="shell">
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-stack">
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+
+    <p class="footer-note">ZKTeco Attendance System</p>
+
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+
+</body>
 </html>
