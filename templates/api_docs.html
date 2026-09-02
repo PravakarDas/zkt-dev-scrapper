@@ -30,6 +30,79 @@
 
 </div>
 
+<div class="card card-pad" style="margin-bottom:16px;">
+
+    <strong>Cheat sheet &mdash; common queries</strong>
+    <p class="cell-muted" style="margin-top:4px;">
+        Every example below needs the <code>X-API-Key</code> header shown above.
+        Full parameter reference (with descriptions) is in the interactive
+        docs below &mdash; this is just the fast path for the questions people
+        actually ask.
+    </p>
+
+    <div class="example-grid">
+
+        <div class="example">
+            <div class="example-title">One employee, a date range</div>
+            <pre>curl -H "X-API-Key: &lt;key&gt;" \
+  "{{ request.url_root }}api/v1/attendance?employee_id=23&amp;from_date=2026-08-01&amp;to_date=2026-08-31"</pre>
+        </div>
+
+        <div class="example">
+            <div class="example-title">One record, by its API id</div>
+            <pre>curl -H "X-API-Key: &lt;key&gt;" \
+  "{{ request.url_root }}api/v1/attendance/4821"</pre>
+        </div>
+
+        <div class="example">
+            <div class="example-title">Filter by punch type</div>
+            <pre>curl -H "X-API-Key: &lt;key&gt;" \
+  "{{ request.url_root }}api/v1/attendance?punch_type=Check+In"</pre>
+            <p class="example-note">
+                Valid values come from <code>GET /attendance/filters</code> below.
+                <code>status</code> is a separate field (device verification
+                method, e.g. fingerprint vs. password) &mdash; it is
+                <em>not</em> check-in/out state. Filter on that with
+                <code>?status=1</code> if you specifically need it.
+            </p>
+        </div>
+
+        <div class="example">
+            <div class="example-title">Is there any new data? (polling / integration)</div>
+            <pre>curl -H "X-API-Key: &lt;key&gt;" "{{ request.url_root }}api/v1/stats"
+# -> remember "latest_id" from the response, e.g. 46132
+
+curl -H "X-API-Key: &lt;key&gt;" \
+  "{{ request.url_root }}api/v1/attendance?since_id=46132&amp;sort_by=id&amp;sort_dir=asc"
+# -> only records inserted after id 46132.
+# empty "data" = nothing new yet. Otherwise take the highest
+# "id" you received and use it as the next since_id.</pre>
+            <p class="example-note">
+                <code>since_id</code> is keyed off the auto-incrementing row
+                id, not a timestamp &mdash; safe even if a device's clock
+                drifts or a punch gets backdated.
+            </p>
+        </div>
+
+        <div class="example">
+            <div class="example-title">Export to CSV</div>
+            <pre>curl -H "X-API-Key: &lt;key&gt;" \
+  "{{ request.url_root }}api/v1/attendance/export.csv?branch=CTG+Office" \
+  -o attendance.csv</pre>
+            <p class="example-note">Accepts the same filters as the list endpoint, including since_id.</p>
+        </div>
+
+        <div class="example">
+            <div class="example-title">What values can I filter on right now?</div>
+            <pre>curl -H "X-API-Key: &lt;key&gt;" \
+  "{{ request.url_root }}api/v1/attendance/filters"</pre>
+            <p class="example-note">Returns the current branches, device IPs/serials, punch types and status codes actually present in the data.</p>
+        </div>
+
+    </div>
+
+</div>
+
 <div class="card">
     <div id="swagger-ui" style="padding:8px;"></div>
 </div>

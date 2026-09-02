@@ -184,14 +184,36 @@ forms — they're low-frequency admin actions, not the thing that was slow.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/api/v1/health` | No API key required. |
-| GET | `/api/v1/attendance` | Filters: `employee_id`, `branch`, `device_ip`, `device_serial`, `punch_type`, `status`, `search` (name/ID), `from_date`, `to_date`; plus `sort_by`/`sort_dir`, `page`/`per_page`. |
+| GET | `/api/v1/attendance` | Filters: `since_id`, `employee_id`, `branch`, `device_ip`, `device_serial`, `punch_type`, `status`, `search` (name/ID), `from_date`, `to_date`; plus `sort_by`/`sort_dir`, `page`/`per_page`. |
 | GET | `/api/v1/attendance/<id>` | Single record. |
-| GET | `/api/v1/attendance/export.csv` | Same filters as list, streams CSV. |
-| GET | `/api/v1/attendance/filters` | Cached dropdown values. |
-| GET | `/api/v1/stats` | Cached summary counts (total records, today, unique employees, device counts). |
+| GET | `/api/v1/attendance/export.csv` | Same filters as list (including `since_id`), streams CSV. |
+| GET | `/api/v1/attendance/filters` | Cached dropdown values (branches, device IPs/serials, punch types, status codes actually present in the data). |
+| GET | `/api/v1/stats` | Cached summary counts, including `latest_id` (highest attendance row id right now — the bootstrap value for `since_id` polling). |
 | GET | `/api/v1/devices` | Read-only, pooled (`web_database.list_devices()`). |
 | POST | `/api/v1/devices` | Same test-then-save flow as the HTML form, calls `database.add_device()` unchanged. Body: `{branch_name, ip_address, port}`. |
 | POST | `/api/v1/devices/<device_id>/activate` `/deactivate` | Calls `database.py` unchanged. |
+
+**Incremental polling (`since_id`)**: added after the initial redesign
+because a downstream integration and employee self-service via Postman both
+need "did anything new arrive since I last checked." `id` (the attendance
+table's `BIGSERIAL` primary key) is used as the cursor rather than a
+timestamp — it's assigned at insert time and strictly increasing, so it
+can't miss or double-count rows the way filtering on `attendance_time` or
+`created_at` could around clock drift/backdated punches. Pattern: call
+`GET /stats` once for `latest_id`, then poll
+`GET /attendance?since_id=<last_seen_id>&sort_by=id&sort_dir=asc`, advancing
+`last_seen_id` to the max `id` seen each time. Documented with a full
+worked example in the `since_id` parameter description in
+`openapi_spec.py` and as a cheat-sheet card on `/api/docs`
+(`templates/api_docs.html`).
+
+**On the `status` field**: it is a raw device verification-method code
+(observed values in this data: 1, 3, 4 — likely fingerprint/password/card
+or similar), **not** check-in/out state — that's `punch`/`punch_type`.
+There's no authoritative ZKTeco mapping encoded anywhere in this codebase;
+don't invent one. `punch_type` also has a real `'Unknown'` bucket in
+production data (raw `punch` code 255, not in `collector.py`'s
+`PUNCH_TYPES` dict) — worth knowing if you're asked to reconcile counts.
 
 **Auth**: every route above except `/health` and `/openapi.json` requires
 header `X-API-Key: <value>`. The key lives in `.env` as `API_KEY` (not

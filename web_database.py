@@ -115,6 +115,20 @@ def build_filters(args):
         except ValueError:
             conditions.append("1 = 0")
 
+    # since_id: "give me everything new since the last record I saw".
+    # id is an auto-incrementing primary key assigned at insert time, so
+    # this is a safe polling cursor - unlike a timestamp filter it can't
+    # miss or double-count rows around clock boundaries.
+    since_id = (args.get("since_id") or "").strip()
+
+    if since_id:
+
+        try:
+            conditions.append("id > %s")
+            params.append(int(since_id))
+        except ValueError:
+            conditions.append("1 = 0")
+
     employee_id = (args.get("employee_id") or "").strip()
 
     if employee_id:
@@ -351,6 +365,7 @@ def _load_stats():
     query = f"""
         SELECT
             COUNT(*) AS total_records,
+            COALESCE(MAX(id), 0) AS latest_id,
             COUNT(*) FILTER (
                 WHERE attendance_time >= CURRENT_DATE
             ) AS records_today,
