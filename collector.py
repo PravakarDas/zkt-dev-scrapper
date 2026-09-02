@@ -40,7 +40,7 @@ PUNCH_TYPES = {
     2: "Break In",
     3: "Break Out",
     4: "Overtime In",
-    5: "Out",
+    5: "Overtime Out",
 }
 
 
