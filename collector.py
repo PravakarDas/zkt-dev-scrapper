@@ -25,7 +25,7 @@ RETRY_SECONDS = 5
 
 # Keep 1 minutes for testing.
 # Change to 45 after testing.
-SAFETY_SYNC_MINUTES = 45
+SAFETY_SYNC_MINUTES = 60
 
 DEVICE_REFRESH_SECONDS = 10
 
