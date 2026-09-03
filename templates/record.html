@@ -1,390 +1,78 @@
 {% extends "base.html" %}
 
-{% block title %}
-Record #{{ record.id }} - ZKTeco
-{% endblock %}
-
+{% block title %}Record #{{ record.id }} - ZKTeco{% endblock %}
 
 {% block content %}
 
-<style>
-
-    .record-header {
-
-        display: flex;
-
-        justify-content: space-between;
-
-        align-items: center;
-
-        margin-bottom: 20px;
-
-        gap: 15px;
-    }
-
-
-    .record-header h2 {
-
-        margin: 0;
-
-        font-size: 24px;
-    }
-
-
-    .record-card {
-
-        background: white;
-
-        border-radius: 8px;
-
-        padding: 25px;
-
-        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-
-
-    .record-grid {
-
-        display: grid;
-
-        grid-template-columns:
-            repeat(auto-fit, minmax(260px, 1fr));
-
-        gap: 18px;
-    }
-
-
-    .record-item {
-
-        border-bottom: 1px solid #eee;
-
-        padding-bottom: 12px;
-    }
-
-
-    .record-label {
-
-        font-size: 12px;
-
-        color: #777;
-
-        margin-bottom: 5px;
-
-        font-weight: bold;
-
-        text-transform: uppercase;
-    }
-
-
-    .record-value {
-
-        font-size: 15px;
-
-        word-break: break-word;
-    }
-
-
-    .raw-data {
-
-        margin-top: 25px;
-
-        padding: 15px;
-
-        background: #f5f5f5;
-
-        border-radius: 6px;
-
-        overflow-x: auto;
-
-        white-space: pre-wrap;
-
-        word-break: break-word;
-
-        font-family: monospace;
-
-        font-size: 13px;
-    }
-
-
-    .button {
-
-        display: inline-block;
-
-        background: #222;
-
-        color: white;
-
-        padding: 10px 16px;
-
-        border-radius: 6px;
-
-        text-decoration: none;
-
-        font-size: 14px;
-    }
-
-
-    .button:hover {
-
-        background: #444;
-    }
-
-
-    @media (max-width: 700px) {
-
-        .record-header {
-
-            flex-direction: column;
-
-            align-items: flex-start;
-        }
-
-    }
-
-</style>
-
-
-<div class="record-header">
-
+<div class="page-header">
     <div>
-
-        <h2>
-            Attendance Record #{{ record.id }}
-        </h2>
-
+        <h1>Record #{{ record.id }}</h1>
+        <p>{{ record.user_name or "Unknown employee" }} &middot; {{ record.branch_name }}</p>
     </div>
-
-
-    <a
-        href="{{ url_for('index') }}"
-        class="button"
-    >
-        Back to Attendance
-    </a>
-
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">&larr; Back to list</a>
 </div>
 
-
-<div class="record-card">
-
-    <div class="record-grid">
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                ID
-            </div>
-
-            <div class="record-value">
-                {{ record.id }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Branch
-            </div>
-
-            <div class="record-value">
-                {{ record.branch_name or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Device IP
-            </div>
-
-            <div class="record-value">
-
-                {{ record.device_ip or '-' }}
-
-                {% if record.device_port %}
-                    :{{ record.device_port }}
-                {% endif %}
-
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Device Name
-            </div>
-
-            <div class="record-value">
-                {{ record.device_name or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Serial Number
-            </div>
-
-            <div class="record-value">
-                {{ record.serial_number or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Firmware
-            </div>
-
-            <div class="record-value">
-                {{ record.firmware or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Platform
-            </div>
-
-            <div class="record-value">
-                {{ record.platform or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Employee ID
-            </div>
-
-            <div class="record-value">
-                {{ record.user_id or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Employee Name
-            </div>
-
-            <div class="record-value">
-                {{ record.user_name or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Attendance Time
-            </div>
-
-            <div class="record-value">
-                {{ record.attendance_time or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Status
-            </div>
-
-            <div class="record-value">
-                {{ record.status if record.status is not none else '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Punch
-            </div>
-
-            <div class="record-value">
-                {{ record.punch if record.punch is not none else '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Punch Type
-            </div>
-
-            <div class="record-value">
-                {{ record.punch_type or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Created At
-            </div>
-
-            <div class="record-value">
-                {{ record.created_at or '-' }}
-            </div>
-
-        </div>
-
-
-        <div class="record-item">
-
-            <div class="record-label">
-                Record Hash
-            </div>
-
-            <div class="record-value">
-                {{ record.record_hash or '-' }}
-            </div>
-
-        </div>
-
-
+<div class="record-grid">
+
+    <div class="record-item">
+        <div class="k">Employee</div>
+        <div class="v">{{ record.user_name or "Unknown" }} (ID {{ record.user_id }})</div>
     </div>
 
+    <div class="record-item">
+        <div class="k">Attendance Time</div>
+        <div class="v">{{ record.attendance_time }}</div>
+    </div>
 
-    {% if record.raw_data %}
+    <div class="record-item">
+        <div class="k">Punch Type</div>
+        <div class="v">{{ record.punch_type }} (code {{ record.punch }})</div>
+    </div>
 
-        <div class="record-label" style="margin-top:25px;">
-            Raw Data
-        </div>
+    <div class="record-item">
+        <div class="k">Status</div>
+        <div class="v">{{ record.status if record.status is not none else "-" }}</div>
+    </div>
 
-        <div class="raw-data">
-            {{ record.raw_data }}
-        </div>
+    <div class="record-item">
+        <div class="k">Branch</div>
+        <div class="v">{{ record.branch_name }}</div>
+    </div>
 
-    {% endif %}
+    <div class="record-item">
+        <div class="k">Device</div>
+        <div class="v">{{ record.device_name or "-" }}</div>
+    </div>
+
+    <div class="record-item">
+        <div class="k">Device IP : Port</div>
+        <div class="v">{{ record.device_ip }}:{{ record.device_port }}</div>
+    </div>
+
+    <div class="record-item">
+        <div class="k">Serial Number</div>
+        <div class="v">{{ record.serial_number or "-" }}</div>
+    </div>
+
+    <div class="record-item">
+        <div class="k">Firmware</div>
+        <div class="v">{{ record.firmware or "-" }}</div>
+    </div>
+
+    <div class="record-item">
+        <div class="k">Platform</div>
+        <div class="v">{{ record.platform or "-" }}</div>
+    </div>
+
+    <div class="record-item">
+        <div class="k">Created At</div>
+        <div class="v">{{ record.created_at }}</div>
+    </div>
+
+    <div class="record-item">
+        <div class="k">Record Hash</div>
+        <div class="v mono">{{ record.record_hash }}</div>
+    </div>
 
 </div>
 

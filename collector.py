@@ -37,8 +37,8 @@ DEVICE_REFRESH_SECONDS = 10
 PUNCH_TYPES = {
     0: "Check In",
     1: "Check Out",
-    2: "Break In",
-    3: "Break Out",
+    2: "Break Out",
+    3: "Break In",
     4: "Overtime In",
     5: "Overtime Out",
 }
