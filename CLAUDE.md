@@ -257,10 +257,10 @@ Flask app + API (app.py, api.py, web_database.py, db_pool.py)
 
 ## Known rough edges / things to confirm before relying on them
 
-- `SAFETY_SYNC_MINUTES` in `collector.py` has a comment suggesting it was
-  temporarily set low for testing ("Keep 1 minutes for testing... Change to
-  45 after testing") but the value is `45`. Confirm this is the intended
-  production value.
+- `SAFETY_SYNC_MINUTES` in `collector.py` is `60` (bumped from `45` in
+  commit `7e85565`, "properly listen after 1hr with full fresh data"). The
+  comment above it ("Keep 1 minutes for testing... Change to 45 after
+  testing") is now stale/pre-dates that change — not a live TODO.
 - `config.py`'s `DEVICES` list and several tunables are vestigial — devices
   are actually sourced from the `zkt_devices` DB table at runtime.
 - `zkteco.py` (`ZKTecoDevice` class) is unused by the live collector path.
