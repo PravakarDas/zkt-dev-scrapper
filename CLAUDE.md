@@ -255,6 +255,23 @@ Flask app + API (app.py, api.py, web_database.py, db_pool.py)
   likewise configurable via `.env` (`WEB_POOL_MIN_SIZE`, `WEB_POOL_MAX_SIZE`,
   `FILTER_CACHE_SECONDS`, `STATS_CACHE_SECONDS`) but have sane defaults.
 
+## pyzk connects over TCP, but pings first unless told not to
+
+`pyzk`'s `ZK.connect()` (used by `collector.py`, `device_manager.py`,
+`zkteco.py`, `zkteco_to_csv.py`) does an OS-level ICMP `ping` shell-out
+*before* attempting the actual TCP connection, and raises
+`ZKNetworkError("can't reach device (ping <ip>)")` if that ping fails —
+even if the TCP port the device actually talks on is completely reachable.
+Many routers/NATs/firewalls (especially for port-forwarded devices at a
+remote branch) block ICMP echo while still forwarding the TCP port fine, so
+this false-negative is common, not an edge case. All four files construct
+`ZK(..., ommit_ping=True)` for this reason — skips the ping shell-out,
+relies on the real TCP connect (which `pyzk` still performs, so genuinely
+unreachable devices still fail correctly). If a device add ever fails with
+that exact "can't reach device (ping ...)" message, confirm with
+`nc -vz <ip> <port>` before assuming the device is actually down — if `nc`
+succeeds, this is almost certainly the same ICMP-blocked situation.
+
 ## Known rough edges / things to confirm before relying on them
 
 - `SAFETY_SYNC_MINUTES` in `collector.py` is `60` (bumped from `45` in

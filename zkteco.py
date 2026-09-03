@@ -21,7 +21,7 @@ class ZKTecoDevice:
             timeout=self.timeout,
             password=0,
             force_udp=False,
-            ommit_ping=False,
+            ommit_ping=True,
         )
 
         self.conn = zk.connect()

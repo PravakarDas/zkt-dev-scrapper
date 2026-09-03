@@ -32,7 +32,7 @@ def connect_device():
         timeout=30,
         password=0,
         force_udp=False,
-        ommit_ping=False
+        ommit_ping=True
     )
 
     try:

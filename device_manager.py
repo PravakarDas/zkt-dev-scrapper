@@ -18,7 +18,7 @@ def test_device(
             timeout=10,
             password=password,
             force_udp=False,
-            ommit_ping=False
+            ommit_ping=True
         )
 
         conn = zk.connect()
