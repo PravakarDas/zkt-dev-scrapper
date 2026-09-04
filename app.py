@@ -5,9 +5,12 @@ from flask import (
     redirect,
     url_for,
     flash,
+    jsonify,
 )
 
 from config import API_KEY
+
+from rate_limiter import limiter
 
 from web_database import (
     get_record,
@@ -31,7 +34,19 @@ app = Flask(__name__)
 
 app.secret_key = "zkteco-local-secret-key"
 
+limiter.init_app(app)
+
 app.register_blueprint(api_bp)
+
+
+@app.errorhandler(429)
+def rate_limit_handler(error):
+
+    return jsonify({
+        "error": "rate_limited",
+        "message": f"Rate limit exceeded ({error.description}). "
+                   f"Please slow down and try again shortly.",
+    }), 429
 
 
 @app.context_processor

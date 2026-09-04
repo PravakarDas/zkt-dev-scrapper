@@ -54,8 +54,31 @@ table (via `get_active_devices()`) every `DEVICE_REFRESH_SECONDS` (10s) and
 spawns one daemon thread (`run_device`) per active device it doesn't already
 have a thread for. Devices are added/removed at runtime through the Flask UI
 (`/devices/add`, `/devices/<id>/remove`) — the collector picks up changes
-without a restart. Threads for removed devices are only *untracked*, not
-forcibly killed; the running thread notices on its own retry cycle.
+without a restart.
+
+**Deactivation is self-checked, not externally killed** (fixed 2026-09,
+was previously a real bug — see below): each `run_device()` thread checks
+`is_device_active(device_id)` (in `database.py`) itself, at two points —
+once at the top of its reconnect loop (before bothering to connect), and
+again roughly every `STATUS_CHECK_SECONDS` (15s) inside `live_monitor()`'s
+polling loop. If the device has been deactivated, `live_monitor()` returns
+`"deactivated"` and the thread exits its `while` loop for good — it is not
+forcibly killed from outside, it notices and stops itself, typically within
+~15s of the "Remove" action. `device_manager()` only removes a device from
+its `running_devices` tracking dict once `thread.is_alive()` is `False`
+(not the moment the DB row flips to inactive) — this is what prevents a
+second thread being spawned for the same physical device if it's quickly
+reactivated while the first thread is still winding down.
+
+**Why this matters**: `update_device_online()` (called every time a thread
+(re)connects — every resync, every retry) intentionally does **not** touch
+`status` — it only used to touch it. Before this fix it unconditionally set
+`status = 'active'` on every reconnect, which silently undid a manual
+"Remove device" the next time that device's thread happened to reconnect
+(sometimes within seconds). `status` is now exclusively an admin-controlled
+flag — only `add_device()` / `activate_device()` / `deactivate_device()`
+touch it. If you're asked to add more device metadata refresh logic, do NOT
+have it write `status` — read it via `is_device_active()` instead.
 
 Graceful shutdown: `SIGINT`/`SIGTERM` sets a global `STOP_REQUESTED` flag
 that all loops check.
@@ -68,15 +91,18 @@ that all loops check.
 | `database.py` | All Postgres access: schema creation (`create_table`), device CRUD, bulk attendance insert (`insert_records`, COPY-based), name backfill. Single source of truth for the schema. |
 | `config.py` | Loads `.env` via `python-dotenv`, exposes `DATABASE_URL`. Also holds a legacy/unused static `DEVICES` list and tunables (`DEVICE_RETRY_SECONDS`, `FULL_SYNC_AFTER_MINUTES`, etc.) that **`collector.py` does not actually read** — it hardcodes its own copies at the top of the file. Devices now come from the `zkt_devices` DB table, not this list. Treat `config.py`'s constants as stale/decorative until reconciled. |
 | `zkteco.py` | `ZKTecoDevice` — a thin OOP wrapper around `pyzk`'s `ZK` (connect/disconnect/get_users/get_attendance/live_capture). **Not used by `collector.py`**, which talks to `pyzk`'s `ZK` directly. Appears to be an earlier abstraction; check before extending it. |
-| `device_manager.py` | `test_device()` — connects to a device once, reads its identity, disconnects. Used by both the HTML "Add Device" form (`app.py`) and the `POST /api/v1/devices` endpoint (`api.py`) to validate a device before saving it. Unchanged by the redesign. |
+| `device_manager.py` | `test_device()` — connects to a device once, reads its identity, disconnects. Used **only** by the HTML "Add Device" form in `app.py` — device management is not exposed via the API at all (see below). |
 | `db_pool.py` | Shared `psycopg_pool.ConnectionPool` used by **only** `web_database.py`. Exists purely to remove the ~1.5-2s per-connection handshake cost that made every dashboard/API request slow. `collector.py` and `database.py` do not import this and keep opening plain `psycopg.connect()` connections exactly as before. |
 | `web_database.py` | All read-side Postgres queries: attendance listing/count (one pool checkout, two queries), single record lookup, CSV export, filter-dropdown values and summary stats (both cached in-process with a short TTL — `config.FILTER_CACHE_SECONDS` / `STATS_CACHE_SECONDS`), and read-only device listing (`list_devices()`). Talks to the same tables as `database.py` but is a separate query layer — keep filter/column changes in sync between the two if the schema changes. |
-| `api.py` | Flask blueprint mounted at `/api/v1`. Every route except `/health` and `/openapi.json` requires the `X-API-Key` header (checked in a `before_request`, compared against `config.API_KEY`). Attendance/stats/filters/device-list routes call `web_database.py`; device write routes (`POST /devices`, `.../activate`, `.../deactivate`) call `database.py`'s existing functions unchanged. |
+| `api.py` | Flask blueprint mounted at `/api/v1`. Every route except `/health` and `/openapi.json` requires the `X-API-Key` header (checked in a `before_request`, compared against `config.API_KEY`). Attendance/stats/filters routes call `web_database.py`. `GET /devices` is the only device route — **read-only, on purpose**: add/activate/deactivate are deliberately not reachable via the API, only through the web app's own forms. |
 | `openapi_spec.py` | Hand-written OpenAPI 3.0 dict describing every `/api/v1` endpoint. Served as JSON at `GET /api/v1/openapi.json` — import that URL directly into Postman (File → Import → Link) to get a ready-made collection. Also powers the Swagger UI page at `/api/docs` (`templates/api_docs.html`, Swagger UI loaded from a CDN). |
-| `app.py` | Flask app entry point. Registers the `api.py` blueprint, renders HTML pages (`/`, `/devices`, `/devices/add`, `/record/<id>`, `/api/docs`), and handles the HTML device-management form posts (delegates to `database.py`, logic unchanged from before the redesign — only the templates changed). Injects `api_key` into every template via `context_processor` so the dashboard's own JS can call `/api/v1/*` like any other client. |
-| `zkteco_to_csv.py` | Standalone one-off script: connects to the hardcoded device IP and dumps its full attendance log straight to `attendance_records.csv`. Not part of the collector pipeline; a manual/debug tool. |
+| `rate_limiter.py` | Shared `flask_limiter.Limiter` instance (in-memory storage, keyed on the caller's API key, 200 req/min default, tighter 10/min on CSV export). Imported by both `app.py` (`.init_app(app)`) and `api.py` (per-route `@limiter.limit(...)` / `@limiter.exempt`). |
+| `app.py` | Flask app entry point. Registers the `api.py` blueprint, initializes `rate_limiter.py`'s limiter, renders HTML pages (`/`, `/devices`, `/devices/add`, `/record/<id>`, `/api/docs`), and handles the HTML device-management form posts (delegates to `database.py`, logic unchanged from before the redesign — only the templates changed). Injects `api_key` into every template via `context_processor` so the dashboard's own JS can call `/api/v1/*` like any other client. |
+| `zkteco_to_csv.py` | Standalone one-off script: connects to the hardcoded device IP and dumps its full attendance log straight to `attendance_records.csv`. Not part of the collector pipeline; a manual/debug tool. Leaves a file on disk if run — nothing else in the project writes files to disk (CSV export in the app/API is generated in memory and streamed, never touches the filesystem). |
 | `attendance_records.csv` | Output of `zkteco_to_csv.py` above. Generated data, now gitignored — don't treat it as a source of truth. |
 | `collector.py.bak`, `database.py.bak` | Stale pre-multi-device versions (single hardcoded device, no `zkt_devices` table). Kept in the working tree but gitignored; safe to ignore or delete. |
+| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | Production deployment (added 2026-09). One image, two services: `web` (dashboard/API under `waitress-serve`, real concurrency instead of Flask's single-threaded dev server) and `collector` (same image, `command: python collector.py`). Both read config via `env_file: .env`. See "Running locally" below. |
+| `.env.example` | Template for `.env` — copy it and fill in real values. Not read by any code, just documentation. |
 
 ## Database schema (Neon Postgres)
 
@@ -189,9 +215,7 @@ forms — they're low-frequency admin actions, not the thing that was slow.
 | GET | `/api/v1/attendance/export.csv` | Same filters as list (including `since_id`), streams CSV. |
 | GET | `/api/v1/attendance/filters` | Cached dropdown values (branches, device IPs/serials, punch types, status codes actually present in the data). |
 | GET | `/api/v1/stats` | Cached summary counts, including `latest_id` (highest attendance row id right now — the bootstrap value for `since_id` polling). |
-| GET | `/api/v1/devices` | Read-only, pooled (`web_database.list_devices()`). |
-| POST | `/api/v1/devices` | Same test-then-save flow as the HTML form, calls `database.add_device()` unchanged. Body: `{branch_name, ip_address, port}`. |
-| POST | `/api/v1/devices/<device_id>/activate` `/deactivate` | Calls `database.py` unchanged. |
+| GET | `/api/v1/devices` | Read-only, pooled (`web_database.list_devices()`). **No POST/activate/deactivate on the API** — device management is intentionally web-app-only (see below). |
 
 **Incremental polling (`since_id`)**: added after the initial redesign
 because a downstream integration and employee self-service via Postman both
@@ -223,6 +247,23 @@ any other client would; this is a shared-secret scheme (one key for
 everyone with the URL), not per-user auth — adequate for an internal tool,
 not for anything exposed publicly without additional hardening.
 
+**Device management is deliberately excluded from the API** (decided
+2026-09): the API is meant to be handed out broadly (employees in Postman,
+an integration app), and letting that same key add/remove physical devices
+from the collector was judged too much privilege for a read-oriented key.
+`POST /api/v1/devices` and the activate/deactivate routes that existed
+briefly during the 2026-09 redesign were removed — if you're asked to add
+device write endpoints back to the API, confirm that's really wanted first,
+it was a deliberate choice, not an oversight.
+
+**Rate limiting** (`rate_limiter.py`, added 2026-09): default 200
+requests/minute per API key (falls back to remote IP for unauthenticated
+requests), 10/minute specifically on `/attendance/export.csv` since it's
+the heaviest query. `/health` and `/openapi.json` are exempt. In-memory
+storage — per-process, resets on restart, and if this is ever run with
+multiple worker processes each enforces its own separate budget rather
+than a shared one (same caveat as the TTL cache below).
+
 ## Data flow summary
 
 ```
@@ -236,7 +277,7 @@ Flask app + API (app.py, api.py, web_database.py, db_pool.py)
    -> reads zkt_attendance / zkt_devices through a pooled connection
       (read-only, no writes back to the physical devices)
    -> browser UI (fetches /api/v1/*) + versioned JSON API + CSV export
-   -> device add/activate/deactivate writes still go through database.py
+   -> device add/activate/deactivate: web app forms ONLY, not exposed via API
 ```
 
 ## Environment / secrets
@@ -292,15 +333,52 @@ succeeds, this is almost certainly the same ICMP-blocked situation.
   lock — correct for a single Flask process, but if this is ever run with
   multiple workers/dynos each will have its own cache and its own view of
   "fresh," which is fine for filter dropdowns/stats but worth knowing.
+- **Device identity can silently change.** `prepare_record()` in
+  `collector.py` falls back to `"{ip}:{port}"` as `device_id` if a device's
+  serial can't be read. If that device is on a dynamic IP and it changes,
+  the collector treats it as a brand-new device from then on — new
+  `device_id`, and prior history looks orphaned. No mitigation exists for
+  this today; if asked to fix it, it needs a human-in-the-loop "merge
+  devices" flow, not an automated guess.
+- **`record_hash` isn't device-scoped.** It's `str(attendance)` (the raw
+  pyzk repr) with a global `UNIQUE` constraint, but doesn't include
+  `device_id`. Two different devices producing a punch with identical
+  `user_id`/timestamp-to-the-second/`status`/`punch` would collide on this
+  constraint — that one live insert would raise and get retried on the
+  device's normal error/reconnect cycle, not silently dropped. Realistically
+  very unlikely, not worth "fixing" unless it's actually observed.
+- **CORS is not configured.** Doesn't matter for Postman or the dashboard's
+  own same-origin JS. Would matter if a browser-based integration app on a
+  *different* domain tries to call `/api/v1/*` directly with `fetch()` — add
+  `flask-cors` (or manual headers) if/when that's actually needed; skip it
+  for a backend/server-side integration, which isn't subject to CORS at all.
 
-## Running locally
+## Running in production (Docker)
+
+```bash
+cp .env.example .env   # fill in real DATABASE_URL and API_KEY
+docker compose up -d --build
+```
+
+Two containers from one image: `web` (dashboard/API on port 5000, served by
+`waitress-serve --threads=8` — real concurrent request handling, unlike
+Flask's dev server) and `collector` (same image, `command: python
+collector.py`). Both restart automatically (`restart: unless-stopped`) and
+read config from the same `.env` via `env_file:`. `docker compose logs -f
+collector` / `docker compose logs -f web` to watch either one.
+`docker compose restart collector` after any `collector.py`/`database.py`
+change — like any Python process, it only picks up new code on restart.
+
+## Running locally (dev, no Docker)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 # create .env with DATABASE_URL=postgresql://... and API_KEY=<random string>
 python collector.py     # start the always-on device -> DB sync daemon
-python app.py            # optional: dashboard on http://127.0.0.1:5000
+python app.py            # dashboard on http://127.0.0.1:5000 (dev server -
+                          # single-threaded; use Docker/waitress for anything
+                          # more than solo local testing)
 ```
 
 Dashboard: `http://127.0.0.1:5000`. API docs (Swagger UI): `/api/docs`.

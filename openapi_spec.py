@@ -432,6 +432,7 @@ def build_spec(server_url):
             "/api/v1/devices": {
                 "get": {
                     "summary": "List devices",
+                    "description": "Read-only. Adding, activating and deactivating devices is intentionally only available through the web app's own Devices page - not through this API.",
                     "tags": ["Devices"],
                     "responses": {
                         "200": {
@@ -446,54 +447,6 @@ def build_spec(server_url):
                             },
                         },
                     },
-                },
-                "post": {
-                    "summary": "Add a device",
-                    "description": "Connects to the device to read its serial/firmware/platform, then saves it. The background collector will pick it up automatically (polls every 10s).",
-                    "tags": ["Devices"],
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["branch_name", "ip_address"],
-                                    "properties": {
-                                        "branch_name": {"type": "string", "example": "Dhaka Office"},
-                                        "ip_address": {"type": "string", "example": "203.0.113.5"},
-                                        "port": {"type": "integer", "default": 4370},
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    "responses": {
-                        "201": {"description": "Device added."},
-                        "400": {"description": "Validation error or device unreachable."},
-                        "409": {"description": "A device with this IP/port already exists."},
-                    },
-                },
-            },
-            "/api/v1/devices/{device_id}/activate": {
-                "post": {
-                    "summary": "Activate a device",
-                    "description": "Marks the device active so the collector starts syncing it.",
-                    "tags": ["Devices"],
-                    "parameters": [
-                        {"name": "device_id", "in": "path", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "Device activated."}},
-                },
-            },
-            "/api/v1/devices/{device_id}/deactivate": {
-                "post": {
-                    "summary": "Deactivate a device",
-                    "description": "Marks the device inactive; the collector stops syncing it (existing data is kept).",
-                    "tags": ["Devices"],
-                    "parameters": [
-                        {"name": "device_id", "in": "path", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "Device deactivated."}},
                 },
             },
         },
