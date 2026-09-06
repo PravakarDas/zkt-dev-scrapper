@@ -570,8 +570,6 @@ def update_device_online(
             platform =
                 COALESCE(%s, platform),
 
-            status = 'active',
-
             last_seen = CURRENT_TIMESTAMP,
 
             updated_at = CURRENT_TIMESTAMP
@@ -595,6 +593,42 @@ def update_device_online(
             )
 
         conn.commit()
+
+
+# ============================================================
+# DEVICE ACTIVE CHECK
+#
+# Used by collector.py to notice a device being deactivated
+# (e.g. via the "Remove" button) without waiting for its next
+# natural reconnect. Deliberately does NOT touch status - only
+# admin actions (add_device / activate_device / deactivate_device)
+# are allowed to change it.
+# ============================================================
+
+def is_device_active(device_id):
+
+    query = f"""
+        SELECT status
+
+        FROM {DEVICE_TABLE}
+
+        WHERE device_id = %s
+
+        LIMIT 1
+    """
+
+    with get_connection() as conn:
+
+        with conn.cursor() as cur:
+
+            cur.execute(
+                query,
+                (device_id,)
+            )
+
+            row = cur.fetchone()
+
+    return bool(row) and row[0] == "active"
 
 
 # ============================================================

@@ -14,6 +14,7 @@ from database import (
     get_active_devices,
     update_device_online,
     update_attendance_names,
+    is_device_active,
 )
 
 
@@ -28,6 +29,12 @@ RETRY_SECONDS = 5
 SAFETY_SYNC_MINUTES = 60
 
 DEVICE_REFRESH_SECONDS = 10
+
+# How often a running device thread re-checks zkt_devices.status
+# for itself, so deactivating a device (e.g. the "Remove" button)
+# takes effect quickly instead of only at the next natural
+# reconnect (which could otherwise be up to SAFETY_SYNC_MINUTES away).
+STATUS_CHECK_SECONDS = 15
 
 
 # ============================================================
@@ -658,6 +665,7 @@ def live_monitor(
     print()
 
     last_event = time.time()
+    last_status_check = time.time()
 
     # --------------------------------------------------------
     # live_capture() is a blocking generator.
@@ -747,6 +755,45 @@ def live_monitor(
                 raise value
 
             # ------------------------------------------------
+            # DEACTIVATION CHECK
+            #
+            # Lets "Remove device" take effect within roughly
+            # STATUS_CHECK_SECONDS instead of waiting for the
+            # next safety resync (up to SAFETY_SYNC_MINUTES away).
+            # ------------------------------------------------
+
+            if (
+                time.time() - last_status_check
+                >= STATUS_CHECK_SECONDS
+            ):
+
+                last_status_check = time.time()
+
+                try:
+
+                    still_active = is_device_active(
+                        device["device_id"]
+                    )
+
+                except Exception:
+
+                    # Can't reach the DB right now - don't tear
+                    # down a working live connection over a
+                    # transient lookup failure.
+                    still_active = True
+
+                if not still_active:
+
+                    print()
+                    print("=" * 70)
+                    print(
+                        "DEVICE DEACTIVATED - STOPPING"
+                    )
+                    print("=" * 70)
+
+                    return "deactivated"
+
+            # ------------------------------------------------
             # SAFETY TIMEOUT
             # ------------------------------------------------
 
@@ -794,6 +841,34 @@ def run_device(device):
     while not STOP_REQUESTED:
 
         conn = None
+
+        # ------------------------------------------------
+        # Don't bother reconnecting a device that's been
+        # deactivated since this thread's last attempt
+        # (e.g. while it was sleeping in the retry backoff).
+        # ------------------------------------------------
+
+        known_device_id = device.get("device_id")
+
+        if known_device_id:
+
+            try:
+
+                if not is_device_active(known_device_id):
+
+                    print()
+                    print(
+                        f"Device {device['name']} is no "
+                        f"longer active. Stopping."
+                    )
+
+                    break
+
+            except Exception:
+
+                # Can't reach the DB - fall through and let the
+                # normal connect/retry loop handle it below.
+                pass
 
         try:
 
@@ -929,6 +1004,17 @@ def run_device(device):
             )
 
             if result == "stop":
+
+                break
+
+            if result == "deactivated":
+
+                try:
+                    conn.disconnect()
+                except Exception:
+                    pass
+
+                conn = None
 
                 break
 
@@ -1096,6 +1182,8 @@ def device_manager():
 
             device = {
 
+                "device_id": device_id,
+
                 "name": db_device[
                     "branch_name"
                 ],
@@ -1140,27 +1228,33 @@ def device_manager():
             ] = thread
 
         # ----------------------------------------------------
-        # Remove inactive devices from manager tracking.
+        # Clean up tracking for threads that have actually
+        # stopped (device deactivated, or a fatal error broke
+        # out of run_device's loop).
         #
-        # The actual device thread will finish on its own
-        # after its current retry cycle.
+        # Deliberately keyed on the thread being dead, not on
+        # the device no longer being in active_devices - a
+        # deactivated device's thread notices on its own (see
+        # run_device / live_monitor) and takes a moment to exit.
+        # Untracking it early, before it actually stops, would
+        # let a fast reactivate spawn a second thread for the
+        # same physical device while the first is still running.
         # ----------------------------------------------------
-
-        active_ids = {
-            device["device_id"]
-            for device in active_devices
-        }
 
         for device_id in list(
             running_devices.keys()
         ):
 
-            if device_id not in active_ids:
+            thread = running_devices[
+                device_id
+            ]
+
+            if not thread.is_alive():
 
                 print()
                 print(
                     f"Device {device_id} "
-                    f"is no longer active."
+                    f"thread has stopped."
                 )
 
                 del running_devices[

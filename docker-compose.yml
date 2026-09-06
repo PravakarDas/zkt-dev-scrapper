@@ -1,0 +1,28 @@
+services:
+
+  # Dashboard + REST API, served by waitress (production WSGI
+  # server) instead of Flask's single-threaded dev server.
+  web:
+    build: .
+    image: zkteco-attendance:latest
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Always-on device -> DB sync daemon. Same image as `web`, just
+  # a different command - collector.py is not a web server.
+  collector:
+    build: .
+    image: zkteco-attendance:latest
+    command: ["python", "collector.py"]
+    env_file:
+      - .env
+    restart: unless-stopped
