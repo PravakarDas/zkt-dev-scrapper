@@ -1,9 +1,9 @@
 # ZKTeco Attendance Scrapper
 
 A background service that pulls attendance punch records from **ZKTeco
-fingerprint/face terminals** and stores them in a **PostgreSQL** (Neon)
-database, plus a **Flask dashboard** and a **versioned REST API** for
-browsing, exporting, and integrating with that data.
+fingerprint/face terminals** and stores them in a **PostgreSQL** database,
+plus a **Flask dashboard** and a **versioned REST API** for browsing,
+exporting, and integrating with that data.
 
 Built and tested against a **ZKTeco F18**, but the collector talks to any
 device supported by the `pyzk` protocol.
@@ -16,15 +16,12 @@ device supported by the `pyzk` protocol.
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Project structure](#project-structure)
-- [Getting started](#getting-started)
+- [Getting started (Docker — the fast path)](#getting-started-docker--the-fast-path)
   - [Prerequisites](#prerequisites)
-  - [1. Clone and enter the project](#1-clone-and-enter-the-project)
-  - [2. Create and activate a virtual environment](#2-create-and-activate-a-virtual-environment)
-  - [3. Install dependencies](#3-install-dependencies)
-  - [4. Configure environment variables](#4-configure-environment-variables)
-  - [5. Initialize the database schema](#5-initialize-the-database-schema)
-  - [6. Run it](#6-run-it)
-- [Running in production (Docker)](#running-in-production-docker)
+  - [1. Clone the project](#1-clone-the-project)
+  - [2. Run the setup script](#2-run-the-setup-script)
+  - [What's actually running](#whats-actually-running)
+- [Local development (without Docker)](#local-development-without-docker)
 - [Adding a device](#adding-a-device)
 - [Using the REST API](#using-the-rest-api)
   - [Authentication](#authentication)
@@ -136,6 +133,8 @@ without affecting data collection at all.
 ├── requirements.txt
 ├── Dockerfile
 ├── docker-compose.yml
+├── docker-compose.network.yml  # Optional override: join an external DB's Docker network
+├── deploy.sh                    # One-command setup script (see Getting started)
 ├── .env.example
 └── CLAUDE.md                   # Deep internal architecture notes for contributors
 ```
@@ -144,115 +143,130 @@ without affecting data collection at all.
 > every known edge case, and every design decision? See **`CLAUDE.md`** —
 > it's written for anyone (human or AI) doing deep work on this codebase.
 
-## Getting started
+## Getting started (Docker — the fast path)
+
+This is the intended way to run this project on a server: clone it, run
+one script, done. No Python, no virtual environment, no manual package
+install, no manual database setup — the container installs everything it
+needs, and the schema (tables, indexes, and the dedup constraint) is
+created automatically on first start, safe to re-run against an existing
+database too.
 
 ### Prerequisites
 
-- Python 3.12+
-- A PostgreSQL database (this project is built and tested against
-  [Neon](https://neon.tech), but any Postgres 13+ works)
+- **Docker** on the target machine. If it's not installed yet:
+  ```bash
+  curl -fsSL https://get.docker.com | sudo sh
+  sudo usermod -aG docker $USER   # log out and back in afterwards
+  ```
+- A reachable PostgreSQL database (built and tested against
+  [Neon](https://neon.tech), but any Postgres 13+ works — including one
+  already running in another Docker project on the same server, see
+  below)
 - Network access from wherever the collector runs to your ZKTeco device(s)
   — see [Troubleshooting](#troubleshooting) if a device seems unreachable
 
-### 1. Clone and enter the project
+### 1. Clone the project
 
 ```bash
 git clone <this-repo-url>
 cd "zkt dev scrapper"
 ```
 
-### 2. Create and activate a virtual environment
+### 2. Run the setup script
+
+First run, with your real database URL and a generated API key:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # generate an API key
+
+DATABASE_URL="postgresql://user:password@host:5432/dbname" \
+API_KEY="<the key you just generated>" \
+./deploy.sh
 ```
 
-### 3. Install dependencies
+`deploy.sh` checks Docker is installed, creates `.env` from those values
+(only if `.env` doesn't already exist — it never overwrites one), builds
+the image, and starts both containers. Every run after the first, once
+`.env` exists, is just:
 
 ```bash
-pip install -r requirements.txt
+./deploy.sh
 ```
 
-### 4. Configure environment variables
+Open **`http://<server-ip>:5000`** for the dashboard.
+
+**If your database is Postgres running in a separate project's Docker
+Compose setup on this same server** (a shared VPS, e.g. an existing app's
+database container reachable only by its container name), pass the
+network name too, so this project's containers can actually resolve that
+hostname:
 
 ```bash
-cp .env.example .env
+DATABASE_URL="postgresql://user:pass@postgres:5432/dbname" \
+API_KEY="<key>" \
+DB_NETWORK="<the other project's docker network name>" \
+./deploy.sh
 ```
 
-Edit `.env`:
+Find that network name with `docker network ls` on the server. See
+`.env.example` for more detail, including a note if your connection
+string was copied from a Prisma-based project (drop any `?schema=...`
+query parameter — `psycopg` doesn't understand it and will refuse to
+connect).
 
-```dotenv
-DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
-API_KEY="<a long random string>"
-```
-
-Generate a strong API key:
+**To also register your devices without touching the web UI**, pass
+`DEVICES` — one or more `Branch Name,ip,port` entries separated by `;`:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+DATABASE_URL="postgresql://user:password@host:5432/dbname" \
+API_KEY="<key>" \
+DEVICES="CTG Office,119.10.168.198,1111;Chapai Office,118.179.113.115,8121" \
+./deploy.sh
 ```
 
-### 5. Initialize the database schema
+This connects to each device the same way "Add Device" in the dashboard
+does, reads its serial/firmware automatically, and saves it — skipping
+any device already registered at that IP/port, so it's safe to include
+`DEVICES` on every run, not just the first.
 
-The schema is created automatically the first time the collector runs
-(`create_table()` is idempotent — safe to run against an existing
-database too). Just running `python collector.py` once takes care of the
-two tables and their indexes.
-
-**One thing that isn't automatic:** the composite uniqueness constraint
-that powers deduplication has to be added by hand on a brand-new database:
-
-```sql
-ALTER TABLE zkt_attendance
-  ADD CONSTRAINT zkt_attendance_device_record_unique
-  UNIQUE (device_id, user_id, attendance_time, status, punch);
-```
-
-Run this once against your database (via `psql`, the Neon SQL editor, or
-any Postgres client) before syncing your first device — without it, the
-very first sync will fail.
-
-### 6. Run it
-
-Two independent processes, both need to be running:
+### What's actually running
 
 ```bash
-# Terminal 1 — the always-on collector
-python collector.py
-
-# Terminal 2 — the dashboard and API
-python app.py
-```
-
-Open **http://127.0.0.1:5000** for the dashboard.
-
-> `python app.py` uses Flask's development server, which is
-> single-threaded and explicitly not meant for real use beyond solo local
-> testing. For anything more than that, use Docker (below).
-
-## Running in production (Docker)
-
-```bash
-cp .env.example .env    # fill in real values if you haven't already
-docker compose up -d --build
-```
-
-This builds one image and runs it as two containers:
-
-| Service | What it runs | Notes |
-|---|---|---|
-| `web` | `waitress-serve --threads=8 app:app` | Real multi-threaded WSGI server, port 5000 |
-| `collector` | `python collector.py` | The sync daemon |
-
-Both restart automatically (`restart: unless-stopped`) and read
-configuration from the same `.env` via `env_file`.
-
-```bash
+docker compose ps                  # both containers up?
 docker compose logs -f web         # dashboard/API logs
 docker compose logs -f collector   # sync daemon logs
 docker compose restart collector   # after any collector.py/database.py change
 ```
+
+| Service | What it runs | Notes |
+|---|---|---|
+| `web` | `waitress-serve --threads=8 app:app` | Real multi-threaded WSGI server, port 5000 |
+| `collector` | `python collector.py` | The always-on sync daemon |
+
+Both restart automatically (`restart: unless-stopped`).
+
+## Local development (without Docker)
+
+For actually working on the code, not deploying it:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env           # then fill in DATABASE_URL and API_KEY
+
+python collector.py            # terminal 1 — the sync daemon
+python app.py                  # terminal 2 — dashboard on http://127.0.0.1:5000
+```
+
+The schema is created automatically the first time `collector.py` runs —
+no manual SQL needed, on a fresh database or an existing one.
+
+> `python app.py` uses Flask's development server, which is
+> single-threaded and explicitly not meant for real use beyond solo local
+> testing. Use Docker (above) for anything more than that.
 
 ## Adding a device
 
@@ -397,9 +411,17 @@ check the collector logs for that device's thread.
 **`/api/v1/*` returns a 500 telling you to set `API_KEY`** — `.env` is
 missing or incomplete on the machine running `app.py`.
 
-**A fresh database fails on the first device sync** — see
-[step 5](#5-initialize-the-database-schema); the composite unique
-constraint needs to be added manually.
+**`docker compose up` fails to connect to the database, or the collector
+logs show a DNS/connection error to a hostname like `postgres`** — that
+hostname only resolves between containers on the same Docker network. See
+[step 2](#2-run-the-setup-script) — you likely need `DB_NETWORK` set to
+the other project's network name.
+
+**Connecting fails with `invalid URI query parameter: "schema"`** — your
+`DATABASE_URL` was copied from a Prisma-based project and has a trailing
+`?schema=public`. Remove it — `psycopg` doesn't understand that parameter,
+and `public` is the default schema anyway so nothing is lost by dropping
+it.
 
 ## Known limitations
 

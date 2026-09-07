@@ -101,7 +101,10 @@ that all loops check.
 | `zkteco_to_csv.py` | Standalone one-off script: connects to the hardcoded device IP and dumps its full attendance log straight to `attendance_records.csv`. Not part of the collector pipeline; a manual/debug tool. Leaves a file on disk if run — nothing else in the project writes files to disk (CSV export in the app/API is generated in memory and streamed, never touches the filesystem). |
 | `attendance_records.csv` | Output of `zkteco_to_csv.py` above. Generated data, now gitignored — don't treat it as a source of truth. |
 | `collector.py.bak`, `database.py.bak` | Stale pre-multi-device versions (single hardcoded device, no `zkt_devices` table). Kept in the working tree but gitignored; safe to ignore or delete. |
-| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | Production deployment (added 2026-09). One image, two services: `web` (dashboard/API under `waitress-serve`, real concurrency instead of Flask's single-threaded dev server) and `collector` (same image, `command: python collector.py`). Both read config via `env_file: .env`. See "Running locally" below. |
+| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | Production deployment (added 2026-09). One image, two services: `web` (dashboard/API under `waitress-serve`, real concurrency instead of Flask's single-threaded dev server) and `collector` (same image, `command: python collector.py`). Both read config via `env_file: .env`. See "Running in production" below. |
+| `deploy.sh` | One-command setup for a fresh server (added 2026-09): checks Docker is installed, creates `.env` from `DATABASE_URL`/`API_KEY`/`DB_NETWORK` env vars passed into the script invocation (only if `.env` doesn't already exist), runs `docker compose up -d --build` (layering in `docker-compose.network.yml` when `DB_NETWORK` is set), then — if `DEVICES` is set — runs `seed_devices.py` as a one-off container to register devices too. |
+| `docker-compose.network.yml` | Optional Compose override, only applied when `DB_NETWORK` is set. Attaches `web`/`collector` to an external Docker network by name — needed when Postgres runs in a *different* Docker Compose project on the same server (a shared VPS) and `DATABASE_URL` uses that project's container name as the host. |
+| `seed_devices.py` | Standalone script (added 2026-09): registers one or more devices non-interactively, given a `"Branch,ip,port;Branch,ip,port"` string — reuses `device_manager.test_device()` + `database.add_device()`, the exact same connect-then-save flow as the "Add Device" form. Skips (does not duplicate) a device already registered at a given ip/port, so safe to pass on every `deploy.sh` run. Runs standalone too: `python3 seed_devices.py "..."`. |
 | `.env.example` | Template for `.env` — copy it and fill in real values. Not read by any code, just documentation. |
 
 ## Database schema (Neon Postgres)
@@ -128,18 +131,19 @@ One row per punch event.
   it is **not called anywhere** — dead code / inconsistency to be aware of.
 - **Real deduplication constraint**: a composite `UNIQUE (device_id, user_id,
   attendance_time, status, punch)` — named `zkt_attendance_device_record_unique`
-  in the live Neon database — used by `insert_records()`'s
-  `ON CONFLICT ... DO NOTHING`. Confirmed present via `pg_constraint`, but it
-  is **not created by `create_table()`** (it was added manually/out-of-band
-  at some point). **A fresh database bootstrapped only from
-  `create_table()` will NOT have this constraint**, which would make
-  `insert_records()`'s `ON CONFLICT` clause fail outright. Add it manually
-  when setting up a new environment:
-  ```sql
-  ALTER TABLE zkt_attendance
-    ADD CONSTRAINT zkt_attendance_device_record_unique
-    UNIQUE (device_id, user_id, attendance_time, status, punch);
-  ```
+  — used by `insert_records()`'s `ON CONFLICT ... DO NOTHING`. **As of
+  2026-09, `create_table()` creates this itself** (wrapped in a
+  `DO $$ ... EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
+  END $$;` block, since Postgres has no `ADD CONSTRAINT IF NOT EXISTS`).
+  Both the "already exists" path (existing databases, e.g. the live one)
+  and the "doesn't exist yet" path (a genuinely fresh database) are
+  covered — verified directly against the live database and a disposable
+  scratch table respectively. `duplicate_table`, not `duplicate_object`,
+  is the exception Postgres actually raises for a UNIQUE constraint name
+  collision (its backing index shares the name) — this tripped up the
+  first version of this fix; if you're ever adding a similar "create if
+  missing" DO block for a UNIQUE/PRIMARY KEY constraint elsewhere, catch
+  both exception classes, not just `duplicate_object`.
 
 ### `zkt_devices`
 One row per physical device, managed via the Flask "Devices" page.
@@ -324,9 +328,6 @@ succeeds, this is almost certainly the same ICMP-blocked situation.
 - `zkteco.py` (`ZKTecoDevice` class) is unused by the live collector path.
 - `database.py`'s `make_record_hash()` is unused; `record_hash` is just the
   raw object `repr()`. Real dedup relies on the composite unique constraint.
-- The composite unique constraint on `zkt_attendance` isn't in
-  `create_table()`'s DDL (see Database section above) — it must be added by
-  hand on any new/restored database, or full syncs will crash.
 - `/api/docs` loads Swagger UI from `cdnjs.cloudflare.com` — the docs page
   needs internet access to render; the API itself (`/api/v1/*`) does not.
 - The `web_database.py` TTL cache is a plain in-process dict guarded by a
@@ -355,10 +356,19 @@ succeeds, this is almost certainly the same ICMP-blocked situation.
 
 ## Running in production (Docker)
 
+Intended path for a real server, added 2026-09 alongside the automatic
+schema init above: `git clone` + one script, nothing else.
+
 ```bash
-cp .env.example .env   # fill in real DATABASE_URL and API_KEY
-docker compose up -d --build
+DATABASE_URL="postgresql://user:pass@host:5432/dbname" \
+API_KEY="<generate with: python3 -c 'import secrets; print(secrets.token_urlsafe(32))'>" \
+./deploy.sh
 ```
+
+`deploy.sh` checks Docker is installed, creates `.env` from those vars
+(only if `.env` doesn't already exist — never overwrites one), then runs
+`docker compose up -d --build`. Every run after the first is just
+`./deploy.sh` with no vars needed, since `.env` is already there.
 
 Two containers from one image: `web` (dashboard/API on port 5000, served by
 `waitress-serve --threads=8` — real concurrent request handling, unlike
@@ -368,6 +378,27 @@ read config from the same `.env` via `env_file:`. `docker compose logs -f
 collector` / `docker compose logs -f web` to watch either one.
 `docker compose restart collector` after any `collector.py`/`database.py`
 change — like any Python process, it only picks up new code on restart.
+
+**Database on the same server, not remote** (`docker-compose.network.yml`,
+`DB_NETWORK` in `.env`): if Postgres runs in a *different* Docker Compose
+project on the same machine (e.g. a shared VPS also running another app's
+database), the hostname in `DATABASE_URL` (like `postgres` in
+`postgresql://user:pass@postgres:5432/dbname`) only resolves between
+containers sharing a Docker network — it is not resolvable system-wide.
+Set `DB_NETWORK=<that project's docker network name>` and `deploy.sh`
+layers `docker-compose.network.yml` on top, which attaches `web` and
+`collector` to that external network (`docker network ls` on the server
+to find the name). Without this, `docker compose up` succeeds but the
+containers can't reach the database at all.
+
+**Prisma-originated connection strings**: a `DATABASE_URL` copied from a
+Prisma-based project often has a trailing `?schema=public`. `psycopg`
+does not recognize that query parameter and raises
+`invalid URI query parameter: "schema"` on connect — confirmed directly
+against `psycopg.conninfo.conninfo_to_dict()`. Strip it; `public` is the
+default schema regardless, so nothing changes functionally by removing
+it. Not something to silently work around in code (e.g. by stripping
+unknown query params) — the fix belongs in the `.env` value itself.
 
 ## Running locally (dev, no Docker)
 

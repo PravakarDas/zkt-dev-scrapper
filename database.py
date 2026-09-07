@@ -166,6 +166,36 @@ def create_table():
             """)
 
             # ------------------------------------------------
+            # DEDUPLICATION CONSTRAINT
+            #
+            # insert_records()'s ON CONFLICT clause requires this
+            # exact composite constraint to exist. Postgres has no
+            # "ADD CONSTRAINT IF NOT EXISTS", so this uses the
+            # standard DO-block workaround: try to add it, and
+            # silently do nothing if it's already there (e.g. an
+            # existing database that already has it).
+            # ------------------------------------------------
+
+            cur.execute(f"""
+                DO $$
+                BEGIN
+                    ALTER TABLE {ATTENDANCE_TABLE}
+                        ADD CONSTRAINT
+                        zkt_attendance_device_record_unique
+                        UNIQUE (
+                            device_id,
+                            user_id,
+                            attendance_time,
+                            status,
+                            punch
+                        );
+                EXCEPTION
+                    WHEN duplicate_object OR duplicate_table THEN
+                        NULL;
+                END $$;
+            """)
+
+            # ------------------------------------------------
             # DEVICE INDEXES
             # ------------------------------------------------
 
