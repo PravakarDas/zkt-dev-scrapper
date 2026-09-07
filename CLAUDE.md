@@ -370,11 +370,15 @@ API_KEY="<generate with: python3 -c 'import secrets; print(secrets.token_urlsafe
 `docker compose up -d --build`. Every run after the first is just
 `./deploy.sh` with no vars needed, since `.env` is already there.
 
-Two containers from one image: `web` (dashboard/API on port 5000, served by
-`waitress-serve --threads=8` — real concurrent request handling, unlike
-Flask's dev server) and `collector` (same image, `command: python
-collector.py`). Both restart automatically (`restart: unless-stopped`) and
-read config from the same `.env` via `env_file:`. `docker compose logs -f
+Two containers from one image: `web` (dashboard/API on port 5000 by
+default — override the host side with `WEB_PORT` in `.env`/passed to
+`deploy.sh` if 5000 is already taken on the server; the container's own
+internal port always stays 5000, only the `docker-compose.yml` port
+mapping's host side changes — served by `waitress-serve --threads=8`,
+real concurrent request handling unlike Flask's dev server) and
+`collector` (same image, `command: python collector.py`). Both restart
+automatically (`restart: unless-stopped`) and read config from the same
+`.env` via `env_file:`. `docker compose logs -f
 collector` / `docker compose logs -f web` to watch either one.
 `docker compose restart collector` after any `collector.py`/`database.py`
 change — like any Python process, it only picks up new code on restart.

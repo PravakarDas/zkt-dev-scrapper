@@ -196,6 +196,14 @@ the image, and starts both containers. Every run after the first, once
 
 Open **`http://<server-ip>:5000`** for the dashboard.
 
+**If port 5000 is already used by something else on this server**, pass
+a different host port with `WEB_PORT` (the container's own internal port
+always stays 5000 — this only changes what you connect to from outside):
+
+```bash
+DATABASE_URL="..." API_KEY="..." WEB_PORT="8080" ./deploy.sh
+```
+
 **If your database is Postgres running in a separate project's Docker
 Compose setup on this same server** (a shared VPS, e.g. an existing app's
 database container reachable only by its container name), pass the
@@ -241,7 +249,7 @@ docker compose restart collector   # after any collector.py/database.py change
 
 | Service | What it runs | Notes |
 |---|---|---|
-| `web` | `waitress-serve --threads=8 app:app` | Real multi-threaded WSGI server, port 5000 |
+| `web` | `waitress-serve --threads=8 app:app` | Real multi-threaded WSGI server, port 5000 (or `WEB_PORT` if set) |
 | `collector` | `python collector.py` | The always-on sync daemon |
 
 Both restart automatically (`restart: unless-stopped`).
