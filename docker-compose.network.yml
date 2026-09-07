@@ -1,0 +1,33 @@
+# Optional override, layered on top of docker-compose.yml ONLY when
+# DB_NETWORK is set (see deploy.sh / .env.example).
+#
+# Use this when Postgres is NOT a remote managed DB (like Neon) but
+# instead runs in its own Docker Compose project on the same server
+# (e.g. a shared VPS also running another app's Postgres container).
+# Docker only resolves a container hostname (like "postgres" in a
+# connection string such as postgresql://user:pass@postgres:5432/db)
+# between containers that share a Docker network - this attaches our
+# two services to that other project's network so the hostname in
+# DATABASE_URL actually resolves.
+#
+# Find the network name with:
+#   docker network ls
+# or, from the other project's directory:
+#   docker compose config | grep -A3 networks
+
+services:
+
+  web:
+    networks:
+      - default
+      - db_external
+
+  collector:
+    networks:
+      - default
+      - db_external
+
+networks:
+  db_external:
+    name: ${DB_NETWORK}
+    external: true
