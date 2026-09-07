@@ -194,10 +194,10 @@ the image, and starts both containers. Every run after the first, once
 ./deploy.sh
 ```
 
-Open **`http://<server-ip>:5000`** for the dashboard.
-
-**If port 5000 is already used by something else on this server**, pass
-a different host port with `WEB_PORT` (the container's own internal port
+Open **`http://<server-ip>:5050`** for the dashboard — Docker defaults to
+host port **5050** specifically so it doesn't collide with anything else
+already running on the more common 5000. Override it with `WEB_PORT` if
+you'd rather use a different one (the container's own internal port
 always stays 5000 — this only changes what you connect to from outside):
 
 ```bash
@@ -249,7 +249,7 @@ docker compose restart collector   # after any collector.py/database.py change
 
 | Service | What it runs | Notes |
 |---|---|---|
-| `web` | `waitress-serve --threads=8 app:app` | Real multi-threaded WSGI server, port 5000 (or `WEB_PORT` if set) |
+| `web` | `waitress-serve --threads=8 app:app` | Real multi-threaded WSGI server, host port 5050 by default (or `WEB_PORT` if set) |
 | `collector` | `python collector.py` | The always-on sync daemon |
 
 Both restart automatically (`restart: unless-stopped`).

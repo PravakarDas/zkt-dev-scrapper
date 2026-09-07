@@ -29,10 +29,8 @@
 #   DEVICES="CTG Office,119.10.168.198,1111;Chapai Office,118.179.113.115,8121" \
 #   ./deploy.sh
 #
-# If port 5000 is already taken by something else on this server, pass
-# a different host port with WEB_PORT (the container's own internal
-# port always stays 5000 - this only changes what you connect to from
-# outside):
+# Defaults to host port 5050 (the container's own internal port always
+# stays 5000). Override with WEB_PORT if you want a different one:
 #   DATABASE_URL="..." API_KEY="..." WEB_PORT="8080" ./deploy.sh
 
 set -euo pipefail
@@ -184,7 +182,7 @@ if [ -z "${WEB_PORT:-}" ] && [ -f .env ]; then
     WEB_PORT="$(grep -E '^WEB_PORT=' .env | cut -d= -f2- | tr -d '"' || true)"
 fi
 
-WEB_PORT="${WEB_PORT:-5000}"
+WEB_PORT="${WEB_PORT:-5050}"
 
 echo
 echo "============================================================"

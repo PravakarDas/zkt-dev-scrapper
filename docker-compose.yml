@@ -6,12 +6,12 @@ services:
     build: .
     image: zkteco-attendance:latest
     ports:
-      # Host side is configurable via WEB_PORT (in .env) for servers
-      # where port 5000 is already taken by another project. The
-      # container's own internal port always stays 5000 - only the
-      # host-facing mapping changes, so the healthcheck below (which
-      # runs *inside* the container) is unaffected.
-      - "${WEB_PORT:-5000}:5000"
+      # Defaults to 5050 on the host side (override with WEB_PORT in
+      # .env if needed). The container's own internal port always
+      # stays 5000 - only the host-facing mapping changes, so the
+      # healthcheck below (which runs *inside* the container) is
+      # unaffected.
+      - "${WEB_PORT:-5050}:5000"
     env_file:
       - .env
     restart: unless-stopped
